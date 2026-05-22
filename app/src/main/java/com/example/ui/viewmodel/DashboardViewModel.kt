@@ -207,7 +207,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun initializeGenerativeModel() {
-        val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.example.BuildConfig.GEMINI_API_KEY
+        val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
         val isValidKey = apiKey.isNotEmpty() && apiKey != "MY_GEMINI_API_KEY" && !apiKey.contains("PLACEHOLDER")
         if (isValidKey) {
             generativeModel = GenerativeModel(
