@@ -106,6 +106,18 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isTerminalExpanded = MutableStateFlow(false)
     val isTerminalExpanded: StateFlow<Boolean> = _isTerminalExpanded.asStateFlow()
 
+    private val _isNeuralLinkOffline = MutableStateFlow(false)
+    val isNeuralLinkOffline: StateFlow<Boolean> = _isNeuralLinkOffline.asStateFlow()
+
+    private val _isTestingKey = MutableStateFlow(false)
+    val isTestingKey: StateFlow<Boolean> = _isTestingKey.asStateFlow()
+
+    private val _linkAnalysisResult = MutableStateFlow<String?>(null)
+    val linkAnalysisResult: StateFlow<String?> = _linkAnalysisResult.asStateFlow()
+
+    private val _isAnalyzingLink = MutableStateFlow(false)
+    val isAnalyzingLink: StateFlow<Boolean> = _isAnalyzingLink.asStateFlow()
+
     // Local Persistence Infrastructure: Room Setup
     private val database = AppDatabase.getDatabase(application)
     private val repository = InventorIdeaRepository(database.inventorIdeaDao())
@@ -318,11 +330,36 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val isValidKey = apiKey.isNotEmpty() && apiKey != "MY_GEMINI_API_KEY" && !apiKey.contains("PLACEHOLDER")
         if (isValidKey) {
             generativeModel = GenerativeModel(
-                modelName = "gemini-3.5-flash",
+                modelName = "gemini-1.5-flash", // Upgrading to 1.5 for better intelligence
                 apiKey = apiKey
             )
+            _isNeuralLinkOffline.value = false
         } else {
             generativeModel = null
+            _isNeuralLinkOffline.value = true
+        }
+    }
+
+    fun testNeuralLink() {
+        viewModelScope.launch {
+            _isTestingKey.value = true
+            val model = generativeModel
+            if (model == null) {
+                _isNeuralLinkOffline.value = true
+                _isTestingKey.value = false
+                return@launch
+            }
+
+            try {
+                kotlinx.coroutines.withTimeout(10000) {
+                    model.generateContent("ping")
+                }
+                _isNeuralLinkOffline.value = false
+            } catch (e: Exception) {
+                _isNeuralLinkOffline.value = true
+            } finally {
+                _isTestingKey.value = false
+            }
         }
     }
 
@@ -470,6 +507,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
+            } else {
+                generatedBlueprint = "[ TERMINAL ALERT ] Neural Link is offline. Please configure a valid GEMINI API KEY in the System Settings to restore active intelligence."
             }
 
             // High aesthetic fallback system
@@ -552,17 +591,23 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             val model = generativeModel
             if (model != null) {
                 try {
-                    val promptLocale = if (isAr) "Arabic (العربية)" else "English"
-                    val prompt = "Provide a single, very short daily security alert or threat insight about a modern device hazard (such as WhatsApp hijacking, public charging port dangers / juice jacking, fake Wi-Fi, malicious QR codes) formatted in $promptLocale. Limit output to exactly 12 words or less. Do not use quotes, markdown or introductory text."
-                    val res = model.generateContent(prompt).text ?: ""
-                    val cleanRes = res.trim().replace("\n", " ")
-                    if (cleanRes.isNotEmpty()) {
-                        _intelligenceBrief.value = "[!] ALERT: $cleanRes"
-                        return@launch
+                    kotlinx.coroutines.withTimeout(15000) {
+                        val promptLocale = if (isAr) "Arabic (العربية)" else "English"
+                        val prompt = "Provide a single, very short daily security alert or threat insight about a modern device hazard (such as WhatsApp hijacking, public charging port dangers / juice jacking, fake Wi-Fi, malicious QR codes) formatted in $promptLocale. Limit output to exactly 12 words or less. Do not use quotes, markdown or introductory text."
+                        val res = model.generateContent(prompt).text ?: ""
+                        val cleanRes = res.trim().replace("\n", " ")
+                        if (cleanRes.isNotEmpty()) {
+                            _intelligenceBrief.value = "[!] ALERT: $cleanRes"
+                            _isNeuralLinkOffline.value = false
+                        }
                     }
+                    return@launch
                 } catch (e: Exception) {
                     e.printStackTrace()
+                    _isNeuralLinkOffline.value = true
                 }
+            } else {
+                _isNeuralLinkOffline.value = true
             }
             // Fallback to offline decrypt brief in correct language if model generates empty or throws Exception
             val fallbackInsight = if (isAr) {
@@ -598,20 +643,29 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
             if (model != null) {
                 try {
-                    val res = model.generateContent(
-                        "You are the high-end A.SYRIA V4 brain. Analyze the following project idea or question comprehensively and give a tactical security security brief style response. Under 50 words: $query"
-                    ).text
-                    if (!res.isNullOrEmpty()) {
-                        rawResponse = res.trim()
+                    kotlinx.coroutines.withTimeout(15000) {
+                        val res = model.generateContent(
+                            "You are the high-end A.SYRIA V4 brain. Analyze the following project idea or question comprehensively and give a tactical security security brief style response. Under 50 words: $query"
+                        ).text
+                        if (!res.isNullOrEmpty()) {
+                            rawResponse = res.trim()
+                        }
                     }
+                    _isNeuralLinkOffline.value = false
                 } catch (e: Exception) {
                     e.printStackTrace()
+                    _isNeuralLinkOffline.value = true
                 }
+            } else {
+                rawResponse = "[ TERMINAL ALERT ] Neural Link is offline. Please configure a valid GEMINI API KEY in the System Settings to restore active intelligence."
             }
 
-            if (rawResponse.isEmpty()) {
-                // Return high fidelity contextual feedback offline
-                rawResponse = offlineTerminalResponses[Random.nextInt(offlineTerminalResponses.size)]
+            if (rawResponse.isEmpty() || rawResponse == offlineTerminalResponses[0]) {
+                _isNeuralLinkOffline.value = true
+                if (model != null) {
+                    // Return high fidelity contextual feedback offline
+                    rawResponse = offlineTerminalResponses[Random.nextInt(offlineTerminalResponses.size)]
+                }
             }
 
             // Stream response using character level Typewriter Animation in coroutine
@@ -698,6 +752,51 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             }
             onResponse("") // Trigger fallback
         }
+    }
+
+    fun analyzeResourceLink(url: String, resourceTitle: String = "Unknown Reference") {
+        viewModelScope.launch {
+            _isAnalyzingLink.value = true
+            _linkAnalysisResult.value = null
+            
+            val model = generativeModel
+            val isAr = _isArabic.value
+            
+            if (model != null) {
+                try {
+                    kotlinx.coroutines.withTimeout(20000) {
+                        val promptLocale = if (isAr) "Arabic (العربية)" else "English"
+                        val prompt = """
+                            Analyze the security of this resource link:
+                            Title: $resourceTitle
+                            URL: $url
+                            
+                            Provide a Neural Risk Analysis including: 
+                            1. Safety Score (0-100)
+                            2. Potential Threats (if any)
+                            3. Recommendation
+                            
+                            Output format strictly in $promptLocale. Limit to 80 words. Focus on being tactile and sovereign.
+                        """.trimIndent()
+                        
+                        val res = model.generateContent(prompt).text
+                        _linkAnalysisResult.value = res?.trim()
+                    }
+                    _isNeuralLinkOffline.value = false
+                } catch (e: Exception) {
+                    _isNeuralLinkOffline.value = true
+                    _linkAnalysisResult.value = if (isAr) "فشل الاتصال العصبي أثناء فحص الرابط." else "Neural uplink failed during link analysis."
+                }
+            } else {
+                _isNeuralLinkOffline.value = true
+                _linkAnalysisResult.value = if (isAr) "[ تنبيه نهائي ] العقدة العصبية غير متصلة. يرجى إضافة مفتاح Gemini API صالح في إعدادات النظام." else "[ TERMINAL ALERT ] Neural Link is offline. Please configure a valid GEMINI API KEY in the System Settings to restore active intelligence."
+            }
+            _isAnalyzingLink.value = false
+        }
+    }
+
+    fun clearLinkAnalysis() {
+        _linkAnalysisResult.value = null
     }
 
     override fun onSensorChanged(event: SensorEvent?) {

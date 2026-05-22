@@ -48,6 +48,8 @@ import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.AcademyScreen
 import com.example.ui.screens.ResourcesScreen
 import com.example.ui.screens.SplashScreen
+import com.example.ui.screens.LinkScannerScreen
+import com.example.ui.screens.AboutScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.AmberZen
@@ -58,6 +60,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 
 class MainActivity : FragmentActivity() {
+  private var isSessionAuthenticated = false
+
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
@@ -78,17 +82,23 @@ class MainActivity : FragmentActivity() {
           val navController = rememberNavController()
           val vm: DashboardViewModel = viewModel()
           val prayerVm: com.example.ui.viewmodel.PrayerViewModel = viewModel()
+          val isAr by vm.isArabic.collectAsState()
 
-          fun triggerBiometricAuth(title: String, subtitle: String, onSuccess: () -> Unit) {
+          fun triggerBiometricAuth(title: String, subtitle: String, onCancel: () -> Unit = {}, onSuccess: () -> Unit) {
             val executor = ContextCompat.getMainExecutor(this@MainActivity)
             val biometricPrompt = BiometricPrompt(this@MainActivity, executor,
               object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                   super.onAuthenticationError(errorCode, errString)
-                  Toast.makeText(applicationContext, "Auth Error: $errString", Toast.LENGTH_SHORT).show()
+                  if (errorCode == BiometricPrompt.ERROR_USER_CANCELED || errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON || errorCode == BiometricPrompt.ERROR_CANCELED) {
+                    onCancel()
+                  } else {
+                    Toast.makeText(applicationContext, "Auth Error: $errString", Toast.LENGTH_SHORT).show()
+                  }
                 }
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                   super.onAuthenticationSucceeded(result)
+                  isSessionAuthenticated = true
                   onSuccess()
                 }
                 override fun onAuthenticationFailed() {
@@ -105,13 +115,32 @@ class MainActivity : FragmentActivity() {
 
             biometricPrompt.authenticate(promptInfo)
           }
+
+          fun performSystemLock() {
+            triggerBiometricAuth(
+              title = if (isAr) "تأكيد الهوية السيادية" else "SOVEREIGN IDENTITY VERIFIED",
+              subtitle = if (isAr) "مطلوب بصمة الدخول لفك تشفير النظام" else "Biometric uplink required to decrypt system",
+              onCancel = { finish() },
+              onSuccess = { 
+                Toast.makeText(applicationContext, "Neural Interface Unlocked", Toast.LENGTH_SHORT).show()
+              }
+            )
+          }
           
           DisposableEffect(Unit) {
             val observer = LifecycleEventObserver { _, event ->
               when (event) {
+                Lifecycle.Event.ON_START -> {
+                  if (!isSessionAuthenticated) {
+                    performSystemLock()
+                  }
+                }
                 Lifecycle.Event.ON_RESUME -> {
                   vm.startSensors()
                   prayerVm.updateLocation()
+                }
+                Lifecycle.Event.ON_STOP -> {
+                  isSessionAuthenticated = false
                 }
                 Lifecycle.Event.ON_PAUSE -> vm.stopSensors()
                 else -> {}
@@ -316,7 +345,19 @@ class MainActivity : FragmentActivity() {
                             )
                           }
                         },
-                        icon = { Icon(Icons.Default.Settings, contentDescription = "Settings", tint = if (isSettingsOpen) CyberCyan else Color.White.copy(alpha = 0.4f)) },
+                        icon = { 
+                          Box(contentAlignment = Alignment.Center) {
+                            if (isSettingsOpen) {
+                              Box(
+                                modifier = Modifier
+                                  .size(40.dp)
+                                  .background(CyberCyan.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                                  .border(1.dp, CyberCyan.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                              )
+                            }
+                            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = if (isSettingsOpen) CyberCyan else Color.White.copy(alpha = 0.4f)) 
+                          }
+                        },
                         label = {
                           Text(
                             text = if (isAr) "الإعدادات" else "Settings",
@@ -349,8 +390,11 @@ class MainActivity : FragmentActivity() {
                           DashboardScreen(
                             viewModel = vm, 
                             prayerViewModel = prayerVm,
+                            onNavigateToScanner = {
+                              navController.navigate("scanner")
+                            },
                             onVaultLockRequest = { title, sub, success ->
-                              triggerBiometricAuth(title, sub, success)
+                              triggerBiometricAuth(title, sub, onCancel = {}, onSuccess = success)
                             }
                           )
                         }
@@ -372,14 +416,29 @@ class MainActivity : FragmentActivity() {
                       SettingsScreen(
                         viewModel = vm,
                         onClose = { vm.setSettingsOpen(false) },
+                        onOpenAbout = {
+                          vm.setSettingsOpen(false)
+                          navController.navigate("about")
+                        },
                         onLockRequest = { title, sub, success ->
-                          triggerBiometricAuth(title, sub, success)
+                          triggerBiometricAuth(title, sub, onCancel = {}, onSuccess = success)
                         }
                       )
                     }
                   }
                 }
               }
+            }
+            composable("scanner") {
+              LinkScannerScreen(
+                viewModel = vm,
+                onBack = { navController.popBackStack() }
+              )
+            }
+            composable("about") {
+              AboutScreen(
+                onBack = { navController.popBackStack() }
+              )
             }
           }
         }

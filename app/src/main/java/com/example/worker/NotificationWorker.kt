@@ -64,8 +64,8 @@ class NotificationWorker(context: Context, params: WorkerParameters) : Coroutine
         for ((name, time) in prayers) {
             if (hour == time.first && minute >= time.second && minute <= time.second + 4) {
                 showNotification(
-                    title = if (isAr) "نداء الصلاة" else "Prayer Protocol",
-                    message = if (isAr) "حان الآن وقت صلاة $name بتوقيت السيادة." else "It is now time for $name prayer according to Sovereign sync.",
+                    title = if (isAr) "نداء صلاة الأولوية" else "PRIORITY PRAYER LINK",
+                    message = if (isAr) "تحذير: حان وقت $name. ابدأ بروتوكول الصلاة فوراً." else "ALERT: Time for $name. Initiate prayer protocol immediately.",
                     id = 1001
                 )
                 break
@@ -78,15 +78,21 @@ class NotificationWorker(context: Context, params: WorkerParameters) : Coroutine
         val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(channelId, "Sovereign Alerts", NotificationManager.IMPORTANCE_HIGH)
+            val channel = NotificationChannel(channelId, "SOVEREIGN TACTICAL ALERTS", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Critical system and spiritual intercepts"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 500, 200, 500)
+            }
             notificationManager.createNotificationChannel(channel)
         }
 
         val notification = NotificationCompat.Builder(applicationContext, channelId)
-            .setSmallIcon(android.R.drawable.ic_dialog_info) // System standard
-            .setContentTitle("A.SYRIA V4 | $title")
+            .setSmallIcon(android.R.drawable.stat_sys_warning)
+            .setContentTitle("SYS_ALERT | $title")
             .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
             .build()
 

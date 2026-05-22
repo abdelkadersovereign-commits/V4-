@@ -29,11 +29,16 @@ import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.VoidBlack
 import com.example.ui.viewmodel.DashboardViewModel
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.style.TextAlign
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: DashboardViewModel,
     onClose: () -> Unit,
+    onOpenAbout: () -> Unit,
     onLockRequest: (String, String, () -> Unit) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
@@ -43,7 +48,15 @@ fun SettingsScreen(
     val operatorName by viewModel.operatorName.collectAsState()
     val neuralRole by viewModel.neuralRole.collectAsState()
     
+    val isTestingKey by viewModel.isTestingKey.collectAsState()
+    val isNeuralLinkOffline by viewModel.isNeuralLinkOffline.collectAsState()
+    
+    val uriHandler = LocalUriHandler.current
     val layoutDirection = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
+    
+    BackHandler {
+        onClose()
+    }
     
     var tempOperatorName by remember(operatorName) { mutableStateOf(operatorName) }
     var tempNeuralRole by remember(neuralRole) { mutableStateOf(neuralRole) }
@@ -119,6 +132,50 @@ fun SettingsScreen(
 
                 // Section: Core Security
                 SettingsSectionHeader(if (isAr) "الأمن الجوهري" else "CORE SECURITY")
+
+                // Neural Key Instruction Card
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                        .border(1.dp, AmberZen.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .background(AmberZen.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                        .padding(16.dp)
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = AmberZen, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isAr) "دليل المفتاح العصبي" else "NEURAL KEY GUIDANCE",
+                                color = AmberZen,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = if (isAr) 
+                                "لتمثيل الذكاء الاصطناعي، يرجى الحصول على مفتاح API من Google AI Studio ووضعه أدناه. هذا يسمح للنظام بفك تشفير التهديدات وتحليل الروابط."
+                            else 
+                                "To activate sovereign intelligence, obtain a Gemini API Key from Google AI Studio and enter it below. This enables threat decoding and link analysis.",
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 10.sp,
+                            lineHeight = 16.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { uriHandler.openUri("https://aistudio.google.com/app/apikey") },
+                            colors = ButtonDefaults.buttonColors(containerColor = AmberZen),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(32.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                        ) {
+                            Text(if (isAr) "احصل على المفتاح 🔗" else "GET API KEY 🔗", fontSize = 10.sp, color = VoidBlack, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
                 
                 CyberTextField(
                     label = if (isAr) "مفتاح Gemini API" else "GEMINI API KEY",
@@ -130,6 +187,31 @@ fun SettingsScreen(
                     isAr = isAr,
                     isPassword = true
                 )
+
+                Button(
+                    onClick = { viewModel.testNeuralLink() },
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                    border = BorderStroke(1.dp, if (isNeuralLinkOffline) Color.Red.copy(alpha = 0.5f) else CyberCyan.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(8.dp),
+                    enabled = !isTestingKey
+                ) {
+                    if (isTestingKey) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = CyberCyan, strokeWidth = 2.dp)
+                    } else {
+                        val statusText = if (isNeuralLinkOffline) 
+                            (if (isAr) "فشل الاتصال: اختبار الرابط" else "LINK OFFLINE: TEST UPLINK")
+                            else (if (isAr) "الاتصال مستقر: إعادة الاختبار" else "LINK STABLE: RETEST UPLINK")
+                            
+                        Text(
+                            text = statusText,
+                            color = if (isNeuralLinkOffline) Color.Red else CyberCyan,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -156,6 +238,30 @@ fun SettingsScreen(
                     icon = if (isStealth) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                     tint = if (isStealth) Color.Gray else CyberCyan
                 )
+
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Section: Operator Manual
+                SettingsSectionHeader(if (isAr) "دليل التشغيل" else "SYSTEM DOCUMENTATION")
+                
+                Button(
+                    onClick = { 
+                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                        onOpenAbout() 
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = CyberCyan.copy(alpha = 0.1f)),
+                    border = BorderStroke(1.dp, CyberCyan.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = if (isAr) "عرض دليل التشغيل" else "OPEN OPERATOR MANUAL",
+                        color = CyberCyan,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(24.dp))
 

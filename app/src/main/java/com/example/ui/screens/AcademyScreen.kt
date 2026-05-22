@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -20,6 +21,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -102,6 +104,8 @@ fun AcademyScreen(
     val layoutDirection = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
     val haptic = LocalHapticFeedback.current
 
+    var selectedModule by remember { mutableStateOf<AcademySyllabusModule?>(null) }
+
     val syllabusModules = remember {
         listOf(
             AcademySyllabusModule(
@@ -139,7 +143,9 @@ fun AcademyScreen(
         )
     }
 
-    var selectedModule by remember { mutableStateOf<AcademySyllabusModule?>(null) }
+    BackHandler(enabled = selectedModule != null) {
+        selectedModule = null
+    }
 
     CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
         Column(
@@ -641,8 +647,8 @@ fun NeuralModuleTestView(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 6.dp)
-                        .border(0.75.dp, optionBorderColor, RoundedCornerShape(10.dp))
+                        .padding(vertical = 4.dp)
+                        .border(1.dp, optionBorderColor, RoundedCornerShape(10.dp))
                         .background(optionBgColor, RoundedCornerShape(10.dp))
                         .clickable(enabled = !hasAnsweredCurrent) {
                             haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
@@ -655,19 +661,12 @@ fun NeuralModuleTestView(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .border(
-                                    1.dp,
-                                    if (isSelected) CyberCyan else Color.White.copy(alpha = 0.4f),
-                                    RoundedCornerShape(50)
-                                )
-                                .background(
-                                    if (isSelected) CyberCyan else Color.Transparent,
-                                    RoundedCornerShape(50)
-                                )
-                        )
+                        Surface(
+                            modifier = Modifier.size(10.dp),
+                            shape = RoundedCornerShape(50),
+                            color = if (isSelected) CyberCyan else Color.Transparent,
+                            border = BorderStroke(1.1.dp, if (isSelected) CyberCyan else Color.White.copy(alpha = 0.4f))
+                        ) {}
                         Text(
                             text = option,
                             color = if (isSelected) Color.White else Color.White.copy(alpha = 0.8f),
@@ -678,14 +677,14 @@ fun NeuralModuleTestView(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Submit Button
-            if (!hasAnsweredCurrent && selectedOptionIndex != null) {
+            if (!hasAnsweredCurrent) {
                 Button(
                     onClick = {
                         haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                        val finalChoice = selectedOptionIndex!!
+                        val finalChoice = selectedOptionIndex ?: return@Button
                         hasAnsweredCurrent = true
                         
                         // Score Addition
@@ -715,16 +714,20 @@ fun NeuralModuleTestView(
                             }
                         )
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = CyberCyan.copy(alpha = 0.2f)),
-                    border = BorderStroke(1.dp, CyberCyan),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = CyberCyan.copy(alpha = 0.1f),
+                        disabledContainerColor = Color.White.copy(alpha = 0.02f)
+                    ),
+                    border = BorderStroke(1.dp, if (selectedOptionIndex != null) CyberCyan else Color.White.copy(alpha = 0.1f)),
                     shape = RoundedCornerShape(10.dp),
+                    enabled = selectedOptionIndex != null,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .height(52.dp)
                 ) {
                     Text(
                         text = if (isAr) "إرسال الجواب للتحقق" else "SUBMIT DEPLOYED ANSWER",
-                        color = CyberCyan,
+                        color = if (selectedOptionIndex != null) CyberCyan else Color.White.copy(alpha = 0.3f),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace

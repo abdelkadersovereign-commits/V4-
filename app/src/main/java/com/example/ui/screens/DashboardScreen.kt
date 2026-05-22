@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -41,6 +42,9 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -49,12 +53,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -96,16 +107,13 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.animation.core.animateValue
 import androidx.browser.customtabs.CustomTabsIntent
 import android.net.Uri
+import android.content.Intent
 import androidx.compose.ui.platform.LocalContext
 
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
-import androidx.compose.foundation.lazy.staggeredgrid.items
-import android.content.Intent
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.ui.graphics.vector.ImageVector
 
 // Space Particle representing deep parallax fields
 data class SpaceParticle(
@@ -119,6 +127,7 @@ data class SpaceParticle(
 fun DashboardScreen(
     viewModel: DashboardViewModel,
     prayerViewModel: com.example.ui.viewmodel.PrayerViewModel,
+    onNavigateToScanner: () -> Unit,
     onVaultLockRequest: (String, String, () -> Unit) -> Unit
 ) {
     val context = LocalContext.current
@@ -164,11 +173,9 @@ fun DashboardScreen(
         label = "hudPulseAlpha"
     )
 
-    fun openIntelligenceLink(url: String) {
-        val builder = CustomTabsIntent.Builder()
-        builder.setToolbarColor(android.graphics.Color.parseColor("#0D1117")) // VoidBlack
-        val customTabsIntent = builder.build()
-        customTabsIntent.launchUrl(context, Uri.parse(url))
+    fun openIntelligenceLink(url: String, title: String) {
+        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+        viewModel.analyzeResourceLink(url, title)
     }
 
     // Gemini states
@@ -198,7 +205,24 @@ fun DashboardScreen(
     val operatorName by viewModel.operatorName.collectAsState()
     val neuralRole by viewModel.neuralRole.collectAsState()
 
+    val isNeuralLinkOffline by viewModel.isNeuralLinkOffline.collectAsState()
+    val linkAnalysisResult by viewModel.linkAnalysisResult.collectAsState()
+    val isAnalyzingLink by viewModel.isAnalyzingLink.collectAsState()
+
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    // Phase 20: Tactical Document Details
+    var selectedVaultIdea by remember { mutableStateOf<InventorIdea?>(null) }
+
+    // Navigation BackHandler logic for sovereign stability
+    BackHandler(enabled = isTerminalExpanded || isForgePanelOpen || isVaultViewOpen || selectedVaultIdea != null) {
+        when {
+            selectedVaultIdea != null -> selectedVaultIdea = null
+            isTerminalExpanded -> viewModel.setTerminalExpanded(false)
+            isForgePanelOpen -> viewModel.setForgePanelOpen(false)
+            isVaultViewOpen -> viewModel.setVaultViewOpen(false)
+        }
+    }
 
     // Cubic bezier easing for organic visual pulse cycle
     val cubicBezierEasing = remember { CubicBezierEasing(0.445f, 0.05f, 0.55f, 0.95f) }
@@ -478,211 +502,218 @@ fun DashboardScreen(
                     item {
                         IntelligenceTicker(
                             text = intelligenceBrief,
+                            isOffline = isNeuralLinkOffline,
                             roll = cardRollShift,
                             pitch = cardPitchShift
                         )
                     }
                 }
             } else {
-            // TERMINAL EXTENDED MODE: Interactive Quantum Uplink Station
+            // TERMINAL EXTENDED MODE: Redesigned Strategic Station with Scrollable Area and Blinking Cursor
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
                     .navigationBarsPadding()
                     .imePadding()
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header of expanded terminal panel
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .graphicsLayer {
-                            rotationX = -cardPitchShift * 0.5f
-                            rotationY = cardRollShift * 0.5f
-                        },
-                    horizontalAlignment = Alignment.CenterHorizontally
+                // Header Area
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    IconButton(onClick = { viewModel.setTerminalExpanded(false) }) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close", tint = CyberCyan)
+                    }
+                    val statusColor by animateColorAsState(if (isNeuralLinkOffline) Color.Red else CyberCyan, label = "statusColor")
                     Text(
-                        text = "TACTICAL COGNITIVE STATION",
-                        color = CyberCyan,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 4.sp,
+                        text = if (isNeuralLinkOffline) "LINK_OFFLINE" else "UPLINK_STABLE",
+                        color = statusColor,
+                        fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "SATELLITE INTEL UPLINK ONLINE",
-                        color = AmberZen,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp,
-                        modifier = Modifier.alpha(0.8f)
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Scaled-down thinking reactor displaying thinking state color changes
+                // Scrollable Output Panel (Neural Console)
                 Box(
                     modifier = Modifier
-                        .size(110.dp)
-                ) {
-                    NeuralCore(
-                        roll = coreRollShift * 0.7f,
-                        pitch = corePitchShift * 0.7f,
-                        isThinking = isThinking,
-                        easing = cubicBezierEasing,
-                        sizeDimension = 110,
-                        stateType = stateType
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // High fidelity Terminal View
-                Column(
-                    modifier = Modifier
+                        .weight(1f)
                         .fillMaxWidth()
-                        .border(1.dp, CyberCyan.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                        .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(8.dp))
-                        .padding(14.dp)
+                        .border(1.dp, CyberCyan.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(12.dp))
+                        .padding(16.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "DEC_STATION_FEED://",
-                            color = CyberCyan,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .background(
-                                    if (isThinking) AmberZen else CyberCyan,
-                                    RoundedCornerShape(50)
-                                )
-                        )
+                    val terminalState = rememberScrollState()
+                    LaunchedEffect(terminalResponse) {
+                        terminalState.animateScrollTo(terminalState.maxValue)
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Text(
-                        text = if (terminalResponse.isEmpty()) {
-                            if (isThinking) "TRANSMITTING DATA TO ORBITAL GRID..." else "TERMINAL READY. TRANSMIT QUANTUM QUERY FOR NEURAL ANALYSIS..."
-                        } else {
-                            terminalResponse
-                        },
-                        color = if (isThinking) AmberZen else CyberCyan,
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.Monospace,
-                        lineHeight = 18.sp,
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 100.dp)
-                    )
+                            .fillMaxSize()
+                            .verticalScroll(terminalState)
+                    ) {
+                        Text(
+                            text = if (isAr) "--- بداية التقرير الاستراتيجي ---" else "--- BEGIN STRATEGIC REPORT ---",
+                            color = CyberCyan.copy(alpha = 0.4f),
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        SelectionContainer {
+                            CompositionLocalProvider(LocalLayoutDirection provides (if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr)) {
+                                val cursorColor by animateColorAsState(if (isThinking) AmberZen else CyberCyan, label = "cursor")
+                                val infiniteCursor = rememberInfiniteTransition(label = "cursor")
+                                val cursorAlpha by infiniteCursor.animateFloat(
+                                    initialValue = 1f,
+                                    targetValue = 0f,
+                                    animationSpec = infiniteRepeatable(tween(500), RepeatMode.Reverse),
+                                    label = "cursorAlpha"
+                                )
+
+                                Text(
+                                    text = if (terminalResponse.isEmpty() && !isThinking) {
+                                        if (isAr) "محطة التشفير جاهزة. بانتظار استعلام الهوية..." else "TERMINAL READY. AWAITING CORE QUERY..."
+                                    } else {
+                                        terminalResponse + (if (isThinking || terminalResponse.isNotEmpty()) " " else "")
+                                    },
+                                    color = if (isThinking) AmberZen else CyberCyan,
+                                    fontSize = 14.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    lineHeight = 22.sp
+                                )
+
+                                if (isThinking || terminalResponse.isNotEmpty()) {
+                                    Text(
+                                        text = "_",
+                                        color = cursorColor.copy(alpha = cursorAlpha),
+                                        fontSize = 14.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        modifier = Modifier.offset(x = if (isAr) (-2).dp else 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Dynamic Input Panel
-                OutlinedTextField(
-                    value = terminalInput,
-                    onValueChange = { viewModel.updateTerminalInput(it) },
+                // Input & Submit
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                    textStyle = TextStyle(
-                        color = Color.White,
-                        fontSize = 13.sp,
+                        .padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = terminalInput,
+                        onValueChange = { viewModel.updateTerminalInput(it) },
+                        modifier = Modifier.weight(1f),
+                        textStyle = TextStyle(color = Color.White, fontSize = 14.sp, fontFamily = FontFamily.Monospace),
+                        placeholder = { Text(if (isAr) "أدخل الاستعلام..." else "Enter query...", color = Color.White.copy(alpha = 0.3f), fontSize = 14.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = CyberCyan,
+                            unfocusedBorderColor = CyberCyan.copy(alpha = 0.3f),
+                            cursorColor = CyberCyan
+                        ),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { 
+                            if (terminalInput.isNotBlank()) viewModel.sendTerminalQuery(terminalInput) 
+                            keyboardController?.hide()
+                        })
+                    )
+
+                    Button(
+                        onClick = { 
+                            if (terminalInput.isNotBlank()) viewModel.sendTerminalQuery(terminalInput) 
+                            keyboardController?.hide()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = CyberCyan),
+                        shape = RoundedCornerShape(8.dp),
+                        enabled = !isThinking && terminalInput.isNotBlank(),
+                        modifier = Modifier.height(56.dp)
+                    ) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = VoidBlack)
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // PHASE 19: NEURAL LINK ANALYSIS OVERLAY
+        // ==========================================
+        AnimatedVisibility(
+            visible = isAnalyzingLink || linkAnalysisResult != null,
+            enter = fadeIn() + slideInVertically { it / 2 },
+            exit = fadeOut() + slideOutVertically { it / 2 }
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.85f))
+                    .clickable { viewModel.clearLinkAnalysis() },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .background(VoidBlack, RoundedCornerShape(16.dp))
+                        .border(1.dp, CyberCyan.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "NEURAL LINK ANALYSIS",
+                        color = CyberCyan,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 2.sp,
                         fontFamily = FontFamily.Monospace
-                    ),
-                    placeholder = {
+                    )
+                    
+                    Spacer(modifier = Modifier.height(20.dp))
+                    
+                    if (isAnalyzingLink) {
+                        NeuralCore(
+                            roll = 0f, pitch = 0f, 
+                            isThinking = true, easing = LinearEasing,
+                            sizeDimension = 80, stateType = ContextualVerseEngine.AmbientStateType.HIGH_PERFORMANCE
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Query A.SYRIA V4 brain...",
-                            color = Color.White.copy(alpha = 0.3f),
-                            fontSize = 13.sp,
+                            text = if (isAr) "تحليل الرابط رقمياً..." else "DECODING BRAIN LINK...",
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace
                         )
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Send
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onSend = {
-                            if (terminalInput.isNotBlank()) {
-                                viewModel.sendTerminalQuery(terminalInput)
-                                keyboardController?.hide()
-                            }
+                    } else if (linkAnalysisResult != null) {
+                        Text(
+                            text = linkAnalysisResult!!,
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            lineHeight = 20.sp,
+                            fontFamily = FontFamily.Monospace,
+                            textAlign = TextAlign.Start
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(
+                            onClick = { viewModel.clearLinkAnalysis() },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = CyberCyan),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("CLOSE", fontWeight = FontWeight.Bold, color = VoidBlack)
                         }
-                    ),
-                    maxLines = 3,
-                    singleLine = false,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = CyberCyan,
-                        unfocusedBorderColor = CyberCyan.copy(alpha = 0.4f),
-                        cursorColor = CyberCyan
-                    )
-                )
-
-                // Tactical action suite
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            if (terminalInput.isNotBlank()) {
-                                viewModel.sendTerminalQuery(terminalInput)
-                                keyboardController?.hide()
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = CyberCyan,
-                            contentColor = VoidBlack
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        enabled = !isThinking && terminalInput.isNotBlank()
-                    ) {
-                        Text(
-                            text = "SEND QUERY",
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            letterSpacing = 1.sp
-                        )
-                    }
-
-                    Button(
-                        onClick = {
-                            keyboardController?.hide()
-                            viewModel.setTerminalExpanded(false)
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent,
-                            contentColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(0.75.dp, Color.White.copy(alpha = 0.3f))
-                    ) {
-                        Text(
-                            text = "CLOSE INTERFACE",
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            letterSpacing = 1.sp
-                        )
                     }
                 }
             }
@@ -1007,33 +1038,17 @@ fun DashboardScreen(
                             )
                         }
                     } else {
-                        // Responsive cryptographic idea lists
-                        LazyVerticalStaggeredGrid(
-                            columns = StaggeredGridCells.Fixed(2),
+                        // Phase 20: Tactical Engineering Blueprint Vertical List
+                        LazyColumn(
                             modifier = Modifier.weight(1f),
-                            verticalItemSpacing = 14.dp,
-                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             items(savedIdeas, key = { it.id }) { idea ->
-                                GlowingVaultCrystalCard(
+                                BlueprintEngineeringCard(
                                     idea = idea,
-                                    roll = roll,
-                                    pitch = pitch,
-                                    onDelete = { viewModel.deleteIdea(idea.id) },
-                                    onExport = {
-                                        val decTitle = idea.getDecryptedTitle()
-                                        val decCategory = idea.getDecryptedCategory()
-                                        val decIdea = idea.getDecryptedOriginalIdea()
-                                        val decBlueprint = idea.getDecryptedGeminiBlueprint()
-
-                                        val shareText = "A.SYRIA V4 ARCHIVE BLUEPRINT\n\nTitle: $decTitle\nCategory: $decCategory\n\nORIGINAL CONCEPT:\n$decIdea\n\nGEMINI ANALYSIS:\n$decBlueprint\n\nTimestamp: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(idea.timestamp))}"
-                                        val sendIntent: Intent = Intent().apply {
-                                            action = Intent.ACTION_SEND
-                                            putExtra(Intent.EXTRA_TEXT, shareText)
-                                            type = "text/plain"
-                                        }
-                                        val shareIntent = Intent.createChooser(sendIntent, "DRIPPING BLUEPRINT TO EXTERNAL LINK")
-                                        context.startActivity(shareIntent)
+                                    onClick = { 
+                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                        selectedVaultIdea = idea 
                                     }
                                 )
                             }
@@ -1351,193 +1366,215 @@ fun DashboardScreen(
 // ==========================================
 
 // Phase 5: Glowing Data Crystal holographic card tilting and shining via Gyro metrics
+// Phase 20: Engineering Blueprint Card for the Vault
 @Composable
-fun GlowingVaultCrystalCard(
+fun BlueprintEngineeringCard(
     idea: InventorIdea,
-    roll: Float,
-    pitch: Float,
-    onDelete: () -> Unit,
-    onExport: () -> Unit
+    onClick: () -> Unit
 ) {
-    var isExpanded by remember { mutableStateOf(false) }
-
-    val rawTitle = idea.getDecryptedTitle()
-    val rawCategory = idea.getDecryptedCategory()
-    val rawIdeaText = idea.getDecryptedOriginalIdea()
-    val rawBlueprint = idea.getDecryptedGeminiBlueprint()
-
-    // Gyroscope tilting parameters
-    val tiltRoll = roll * 0.9f
-    val tiltPitch = pitch * 1.0f
-
-    // Dynamic diagonal luminous holographic sheen vector derived from physical rotation vectors
-    val dynamicSheenBrush = Brush.linearGradient(
-        colors = listOf(
-            Color.Transparent,
-            Color.White.copy(alpha = (0.04f + (roll.coerceIn(-5f, 5f) + 5f) / 95f)),
-            Color.Transparent
-        ),
-        start = Offset(0f, 0f),
-        end = Offset(450f + roll * 25f, 450f + pitch * 25f)
-    )
-
-    Column(
+    val title = idea.getDecryptedTitle()
+    val category = idea.getDecryptedCategory()
+    
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer {
-                rotationX = -tiltPitch * 0.75f
-                rotationY = tiltRoll * 0.75f
-                translationX = tiltRoll * 0.4f
-                translationY = tiltPitch * 0.4f
-            }
-            .border(
-                width = 0.75.dp,
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        CyberCyan.copy(alpha = if (isExpanded) 0.6f else 0.28f),
-                        AmberZen.copy(alpha = if (isExpanded) 0.3f else 0.12f)
-                    )
-                ),
-                shape = RoundedCornerShape(12.dp)
-            )
-            .background(GlassWhite, RoundedCornerShape(12.dp))
-            .clickable { isExpanded = !isExpanded }
-            .background(dynamicSheenBrush, RoundedCornerShape(12.dp))
-            .padding(14.dp)
+            .height(90.dp)
+            .border(0.5.dp, CyberCyan.copy(alpha = 0.3f), RoundedCornerShape(2.dp))
+            .background(VoidBlack)
+            .clickable { onClick() }
+            .padding(16.dp)
     ) {
+        // Grid pattern background effect
+        Canvas(modifier = Modifier.fillMaxSize().alpha(0.1f)) {
+            val step = 10.dp.toPx()
+            for (x in 0..size.width.toInt() step step.toInt()) {
+                drawLine(CyberCyan, Offset(x.toFloat(), 0f), Offset(x.toFloat(), size.height), strokeWidth = 0.5f)
+            }
+            for (y in 0..size.height.toInt() step step.toInt()) {
+                drawLine(CyberCyan, Offset(0f, y.toFloat()), Offset(size.width, y.toFloat()), strokeWidth = 0.5f)
+            }
+        }
+
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column {
                 Text(
-                    text = rawTitle.uppercase(),
-                    color = Color.White,
-                    fontSize = 13.5.sp,
+                    text = "BLUEPRINT: ${title.uppercase()}",
+                    color = CyberCyan,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    letterSpacing = 1.sp
                 )
-                Spacer(modifier = Modifier.height(2.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "[$rawCategory]",
-                        color = AmberZen,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "CRYSTAL_INDEX_#${1000 + idea.id % 9000}",
-                        color = Color.White.copy(alpha = 0.4f),
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-
-            // Sync statuses icon matching guidelines
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .background(CyberCyan, RoundedCornerShape(50))
-                )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "SECURED",
-                    color = CyberCyan,
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    text = "CLASSIFICATION: $category // STATUS: ARCHIVED",
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 9.sp,
                     fontFamily = FontFamily.Monospace
                 )
             }
-        }
-
-        // Details expanded view
-        if (isExpanded) {
-            Spacer(modifier = Modifier.height(10.dp))
-            HorizontalDivider(color = Color.White.copy(alpha = 0.15f), thickness = 0.5.dp)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "RAW CONCEPT:",
-                color = Color.White.copy(alpha = 0.5f),
-                fontSize = 8.5.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = rawIdeaText,
-                color = Color.White,
-                fontSize = 12.sp,
-                lineHeight = 17.sp,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "GEMINI EXPERT BLUEPRINT:",
-                color = AmberZen,
-                fontSize = 8.5.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
-            )
             
-            // AI output typewriter box inside the card
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-                    .border(0.5.dp, AmberZen.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
-                    .background(Color.Black.copy(alpha = 0.82f), RoundedCornerShape(6.dp))
-                    .padding(10.dp)
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = CyberCyan.copy(alpha = 0.6f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+// Phase 20: Tactical Document Detail Overlay
+@Composable
+fun TacticalDocumentDetail(
+    idea: InventorIdea?,
+    isAr: Boolean,
+    onClose: () -> Unit,
+    onDelete: () -> Unit,
+    onExport: (InventorIdea) -> Unit
+) {
+    if (idea == null) return
+    
+    val title = idea.getDecryptedTitle()
+    val category = idea.getDecryptedCategory()
+    val rawConcept = idea.getDecryptedOriginalIdea()
+    val analysis = idea.getDecryptedGeminiBlueprint()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.95f))
+            .clickable(enabled = false) { }
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(20.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .border(1.dp, CyberCyan.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                .background(VoidBlack)
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            // Document Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
             ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "TACTICAL_BLUEPRINT // ${title.uppercase()}",
+                        color = CyberCyan,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "CATEGORY: $category // REF: #SOV-${idea.id}",
+                        color = AmberZen,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
                 Text(
-                    text = rawBlueprint,
-                    color = AmberZen,
-                    fontSize = 11.sp,
+                    text = "[ CLOSE ]",
+                    color = CyberCyan,
+                    fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
-                    lineHeight = 16.sp
+                    modifier = Modifier.clickable { onClose() }.padding(4.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+            HorizontalDivider(color = CyberCyan.copy(alpha = 0.2f))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // Export and Purge buttons
+            // Section 1: RAW CONCEPT
+            TacticalSectionHeader(if (isAr) "[ المسودة الأولية ]" else "[ RAW CONCEPT ]")
+            Text(
+                text = rawConcept,
+                color = Color.White,
+                fontSize = 13.sp,
+                lineHeight = 20.sp,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
+            // Section 2: NEURAL ANALYSIS
+            TacticalSectionHeader(if (isAr) "[ التحليل العصبي ]" else "[ NEURAL ANALYSIS ]")
+            Text(
+                text = analysis,
+                color = Color.White.copy(alpha = 0.9f),
+                fontSize = 13.sp,
+                lineHeight = 20.sp,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
+            TacticalSectionHeader("[ TECHNICAL COMPONENTS ]")
+            Text(
+                text = "NEURAL_CORE_v4\nASYMMETRIC_CIPHER_ENGINE\nDISTRIBUTED_PERSISTENCE_GRID",
+                color = GlassWhite,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
+            TacticalSectionHeader("[ SECURITY RISK ASSESSMENT ]")
+            Text(
+                text = "THREAT_LEVEL: LOW (LOCAL_ISOLATION_ACTIVE)\nVECTOR_VULNERABILITY: MINIMAL\nMITIGATION: ENFORCE_ZERO_TRUST",
+                color = Color.Red.copy(alpha = 0.7f),
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(bottom = 32.dp)
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = "[ EXPORT BLUEPRINT ]",
-                    color = CyberCyan,
-                    fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .clickable { onExport() }
-                        .padding(8.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "[ PURGE ]",
-                    color = Color.Red.copy(alpha = 0.8f),
-                    fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .clickable { onDelete() }
-                        .padding(8.dp)
-                )
+                Button(
+                    onClick = { onExport(idea) },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = CyberCyan.copy(alpha = 0.1f)),
+                    border = BorderStroke(1.dp, CyberCyan),
+                    shape = RoundedCornerShape(2.dp)
+                ) {
+                    Text("EXPORT", color = CyberCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+                Button(
+                    onClick = { onDelete() },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.1f)),
+                    border = BorderStroke(1.dp, Color.Red),
+                    shape = RoundedCornerShape(2.dp)
+                ) {
+                    Text("PURGE", color = Color.Red, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
+}
+
+@Composable
+fun TacticalSectionHeader(text: String) {
+    Text(
+        text = text,
+        color = AmberZen,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Black,
+        letterSpacing = 2.sp,
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
 }
 
 // Phase 6 Contextual Wisdom Ambient Insight Typewriter Board
@@ -1926,7 +1963,7 @@ fun NeuralCore(
     roll: Float,
     pitch: Float,
     isThinking: Boolean,
-    easing: CubicBezierEasing,
+    easing: androidx.compose.animation.core.Easing,
     sizeDimension: Int,
     stateType: ContextualVerseEngine.AmbientStateType = ContextualVerseEngine.AmbientStateType.NORMAL
 ) {
@@ -2231,6 +2268,7 @@ fun QiblaCompass(
     }
 }
 
+// Phase 20: Cinematic Spiritual HUD with Circular Gauge
 @Composable
 fun SpiritualRadarGauge(
     roll: Float,
@@ -2252,6 +2290,35 @@ fun SpiritualRadarGauge(
             },
         contentAlignment = Alignment.Center
     ) {
+        // Circular Progress Gauge for Prayer
+        Canvas(modifier = Modifier.size(240.dp).alpha(0.3f * pulseAlpha)) {
+            // Background ring
+            drawArc(
+                color = CyberCyan.copy(alpha = 0.1f),
+                startAngle = 0f,
+                sweepAngle = 360f,
+                useCenter = false,
+                style = Stroke(width = 8.dp.toPx())
+            )
+            // Progress arc
+            drawArc(
+                color = CyberCyan,
+                startAngle = -90f,
+                sweepAngle = 360 * progress,
+                useCenter = false,
+                style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
+            )
+            
+            // Glowing border
+            drawArc(
+                color = CyberCyan.copy(alpha = 0.5f),
+                startAngle = -90f,
+                sweepAngle = 360 * progress,
+                useCenter = false,
+                style = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f)))
+            )
+        }
+
         // Advanced 3D Qibla Compass Layer
         QiblaCompass(
             azimuth = azimuth,
@@ -2267,31 +2334,19 @@ fun SpiritualRadarGauge(
             modifier = Modifier.offset(y = 100.dp) // Offset to sit below the compass center
         ) {
             Text(
-                text = "NEURAL $prayerName LINK",
+                text = "NEXT UPLINK: ${prayerName.uppercase()} // T-MINUS: $countdownText",
                 color = CyberCyan.copy(alpha = pulseAlpha),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Black,
-                letterSpacing = 4.sp,
+                letterSpacing = 1.sp,
                 textAlign = TextAlign.Center,
-                fontFamily = FontFamily.Monospace
-            )
-            
-            Spacer(modifier = Modifier.height(2.dp))
-            
-            Text(
-                text = countdownText,
-                color = Color.White,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold,
                 fontFamily = FontFamily.Monospace,
                 style = TextStyle(
                     shadow = androidx.compose.ui.graphics.Shadow(
-                        color = CyberCyan.copy(alpha = 0.9f * pulseAlpha),
-                        blurRadius = 20f
+                        color = CyberCyan.copy(alpha = 0.4f),
+                        blurRadius = 10f
                     )
-                ),
-                letterSpacing = 2.sp,
-                textAlign = TextAlign.Center
+                )
             )
         }
     }
@@ -2299,7 +2354,7 @@ fun SpiritualRadarGauge(
 
 // Live static/de-crypted information sliding ticker bar of global satellite intercepts
 @Composable
-fun IntelligenceTicker(text: String, roll: Float, pitch: Float) {
+fun IntelligenceTicker(text: String, isOffline: Boolean = false, roll: Float, pitch: Float) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -2309,8 +2364,15 @@ fun IntelligenceTicker(text: String, roll: Float, pitch: Float) {
                 translationX = roll * 0.2f
                 translationY = pitch * 0.2f
             }
-            .border(0.5.dp, CyberCyan.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
-            .background(VoidBlack.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+            .border(
+                0.5.dp, 
+                if (isOffline) Color.Red.copy(alpha = 0.5f) else CyberCyan.copy(alpha = 0.25f), 
+                RoundedCornerShape(6.dp)
+            )
+            .background(
+                if (isOffline) Color.Red.copy(alpha = 0.08f) else VoidBlack.copy(alpha = 0.6f), 
+                RoundedCornerShape(6.dp)
+            )
             .padding(vertical = 8.dp, horizontal = 12.dp)
     ) {
         Row(
@@ -2320,12 +2382,12 @@ fun IntelligenceTicker(text: String, roll: Float, pitch: Float) {
             Box(
                 modifier = Modifier
                     .size(6.dp)
-                    .background(CyberCyan, RoundedCornerShape(50))
+                    .background(if (isOffline) Color.Red else CyberCyan, RoundedCornerShape(50))
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = text,
-                color = CyberCyan,
+                color = if (isOffline) Color.Red else CyberCyan,
                 fontSize = 9.5.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Medium,
