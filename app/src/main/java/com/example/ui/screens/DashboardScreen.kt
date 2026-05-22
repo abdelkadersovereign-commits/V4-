@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.basicMarquee
 import com.example.data.database.InventorIdea
 import com.example.data.ContextualVerseEngine
 import androidx.compose.animation.AnimatedVisibility
@@ -51,8 +52,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,6 +90,9 @@ import com.example.ui.theme.GlassWhite
 import com.example.ui.theme.VoidBlack
 import com.example.ui.viewmodel.DashboardViewModel
 import kotlin.random.Random
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 
 // Space Particle representing deep parallax fields
 data class SpaceParticle(
@@ -135,16 +142,19 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
     val isVaultViewOpen by viewModel.isVaultViewOpen.collectAsState()
 
     // Phase 11 states
+    val isAr by viewModel.isArabic.collectAsState()
     val cyberScore by viewModel.cyberScore.collectAsState()
     val cyberRank by viewModel.cyberRank.collectAsState()
     val cyberProgress by viewModel.cyberProgress.collectAsState()
     val isAcademyOpen by viewModel.isAcademyOpen.collectAsState()
-    val isIntelNodesOpen by viewModel.isIntelNodesOpen.collectAsState()
+    val isResourcesOpen by viewModel.isResourcesOpen.collectAsState()
 
     val forgeTitle by viewModel.forgeTitle.collectAsState()
     val forgeCategory by viewModel.forgeCategory.collectAsState()
     val forgeIdea by viewModel.forgeIdea.collectAsState()
     val forgeBlueprint by viewModel.forgeBlueprint.collectAsState()
+    val operatorName by viewModel.operatorName.collectAsState()
+    val neuralRole by viewModel.neuralRole.collectAsState()
 
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -170,14 +180,14 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
     )
 
     // Multi-layered Parallax dimensions derived from smooth accelerometer roll and pitch
-    val bgRollShift = smoothRoll * 2.8f
-    val bgPitchShift = smoothPitch * 2.8f
+    val bgRollShift by remember { derivedStateOf { smoothRoll * 2.8f } }
+    val bgPitchShift by remember { derivedStateOf { smoothPitch * 2.8f } }
 
-    val coreRollShift = smoothRoll * 1.5f
-    val corePitchShift = smoothPitch * 1.5f
+    val coreRollShift by remember { derivedStateOf { smoothRoll * 1.5f } }
+    val corePitchShift by remember { derivedStateOf { smoothPitch * 1.5f } }
 
-    val cardRollShift = smoothRoll * 0.8f
-    val cardPitchShift = smoothPitch * 0.8f
+    val cardRollShift by remember { derivedStateOf { smoothRoll * 0.8f } }
+    val cardPitchShift by remember { derivedStateOf { smoothPitch * 0.8f } }
 
     val spiritualVerses = remember {
         listOf(
@@ -232,195 +242,192 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
         )
 
         // Conditional Rendering: Main Dashboard or Strategic Terminal Mode
-        if (!isTerminalExpanded) {
-            // STANDARD MODE: Unified Operations Grid
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Top Command Header and System Context Hub
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+        val currentLayoutDirection = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
+        CompositionLocalProvider(LocalLayoutDirection provides currentLayoutDirection) {
+            if (!isTerminalExpanded) {
+                // STANDARD MODE: Unified Operations Grid with LazyColumn fix for scrolling
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    StatusHeaderCell(roll = cardRollShift, pitch = cardPitchShift)
-                    Spacer(modifier = Modifier.height(14.dp))
+                    item {
+                        StatusHeaderCell(
+                            roll = cardRollShift,
+                            pitch = cardPitchShift,
+                            operatorName = operatorName,
+                            neuralRole = neuralRole,
+                            isStealth = isStealthMode
+                        )
+                    }
                     
-                    SovereignContextHub(
-                        roll = cardRollShift,
-                        pitch = cardPitchShift,
-                        connectionType = connectionType,
-                        ipAddress = ipAddress,
-                        batteryPercentage = batteryPercentage,
-                        chargingStatus = chargingStatus
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
+                    item {
+                        SovereignContextHub(
+                            roll = cardRollShift,
+                            pitch = cardPitchShift,
+                            connectionType = connectionType,
+                            ipAddress = ipAddress,
+                            batteryPercentage = batteryPercentage,
+                            chargingStatus = chargingStatus
+                        )
+                    }
 
                     // Phase 6 Contextual Wisdom floating card
-                    AmbientInsightCard(
-                        insight = ambientInsight,
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
+                    item {
+                        AmbientInsightCard(
+                            insight = ambientInsight,
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+                    }
 
                     // Phase 11: Glowing Cyber-Rank tracker bar
-                    CyberRankMetricBar(
-                        score = cyberScore,
-                        rank = cyberRank,
-                        progress = cyberProgress,
-                        roll = cardRollShift,
-                        pitch = cardPitchShift
-                    )
-                }
+                    item {
+                        CyberRankMetricBar(
+                            score = cyberScore,
+                            rank = cyberRank,
+                            progress = cyberProgress,
+                            roll = cardRollShift,
+                            pitch = cardPitchShift
+                        )
+                    }
 
-                // Core Main Space Interface
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "HOLD SHIELD CORE TO ACTIVATE STRATEGIC BRAIN",
-                        color = CyberCyan.copy(alpha = 0.4f),
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(bottom = 6.dp)
-                    )
+                    item {
+                        Text(
+                            text = if (isAr) "اضغط مطولاً على درع النقاط لتنشغيل العصف الاستراتيجي" else "HOLD SHIELD CORE TO ACTIVATE STRATEGIC BRAIN",
+                            color = CyberCyan.copy(alpha = 0.5f),
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.5.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(bottom = 2.dp)
+                        )
+                    }
 
                     // Core responsive node that transitions visually during thinking operations
-                    Box(
-                        modifier = Modifier
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onLongPress = {
-                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                        viewModel.setTerminalExpanded(true)
-                                    }
-                                )
-                            }
-                    ) {
-                        NeuralCore(
-                            roll = coreRollShift,
-                            pitch = corePitchShift,
-                            isThinking = isThinking,
-                            easing = cubicBezierEasing,
-                            sizeDimension = 190,
-                            stateType = stateType
-                        )
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onLongPress = {
+                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                            viewModel.setTerminalExpanded(true)
+                                        }
+                                    )
+                                }
+                        ) {
+                            NeuralCore(
+                                roll = coreRollShift,
+                                pitch = corePitchShift,
+                                isThinking = isThinking,
+                                easing = cubicBezierEasing,
+                                sizeDimension = 190,
+                                stateType = stateType
+                            )
+                        }
                     }
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
 
                     // Tactical Holy Verse Selection Bridge
-                    NeuralVerseModule(
-                        verse = spiritualVerses[currentVerseIndex],
-                        easing = cubicBezierEasing,
-                        onTap = {
-                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                            currentVerseIndex = (currentVerseIndex + 1) % spiritualVerses.size
-                        }
-                    )
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
+                    item {
+                        NeuralVerseModule(
+                            verse = spiritualVerses[currentVerseIndex],
+                            easing = cubicBezierEasing,
+                            onTap = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                currentVerseIndex = (currentVerseIndex + 1) % spiritualVerses.size
+                            }
+                        )
+                    }
 
                     // Phase 5 Action Matrix Integration (FORGE & VAULT controllers)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp)
-                            .graphicsLayer {
-                                rotationX = -cardPitchShift * 0.7f
-                                rotationY = cardRollShift * 0.7f
-                            },
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        TacticalGridButton(
-                            text = "[ ACTIVATE FORGE ]",
-                            color = AmberZen,
-                            onClick = {
-                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                viewModel.setForgePanelOpen(true)
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                        TacticalGridButton(
-                            text = "[ ENTER VAULT ]",
-                            color = CyberCyan,
-                            onClick = {
-                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                viewModel.setVaultViewOpen(true)
-                            },
-                            modifier = Modifier.weight(1f)
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp)
+                                .graphicsLayer {
+                                    rotationX = -cardPitchShift * 0.7f
+                                    rotationY = cardRollShift * 0.7f
+                                },
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            TacticalGridButton(
+                                text = if (isAr) "[ تشغيل المصنع ]" else "[ ACTIVATE FORGE ]",
+                                color = AmberZen,
+                                onClick = {
+                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    viewModel.setForgePanelOpen(true)
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                            TacticalGridButton(
+                                text = if (isAr) "[ دخول الخزنة ]" else "[ ENTER VAULT ]",
+                                color = CyberCyan,
+                                onClick = {
+                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    viewModel.setVaultViewOpen(true)
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    // Secondary controllers (Forge + Vault + Nodes)
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp)
+                                .graphicsLayer {
+                                    rotationX = -cardPitchShift * 0.7f
+                                    rotationY = cardRollShift * 0.7f
+                                },
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            TacticalGridButton(
+                                text = if (isAr) "[ منهج الأكاديمية ]" else "[ ACADEMY SYLLABUS ]",
+                                color = CyberCyan,
+                                onClick = {
+                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    viewModel.setAcademyOpen(true)
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                            TacticalGridButton(
+                                text = if (isAr) "[ مصادر الذكاء ]" else "[ INTEL DIRECTORY ]",
+                                color = AmberZen,
+                                onClick = {
+                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    viewModel.setResourcesOpen(true)
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    item {
+                        SpiritualRadarGauge(
+                            roll = cardRollShift,
+                            pitch = cardPitchShift,
+                            prayerName = nextPrayerName,
+                            countdownText = nextPrayerCountdown,
+                            progress = nextPrayerProgress
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Phase 11 secondary controllers
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp)
-                            .graphicsLayer {
-                                rotationX = -cardPitchShift * 0.7f
-                                rotationY = cardRollShift * 0.7f
-                            },
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        TacticalGridButton(
-                            text = "[ NEURAL ACADEMY ]",
-                            color = CyberCyan,
-                            onClick = {
-                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                viewModel.setAcademyOpen(true)
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                        TacticalGridButton(
-                            text = "[ INTEL NODES ]",
-                            color = AmberZen,
-                            onClick = {
-                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                viewModel.setIntelNodesOpen(true)
-                            },
-                            modifier = Modifier.weight(1f)
+                    item {
+                        IntelligenceTicker(
+                            text = intelligenceBrief,
+                            roll = cardRollShift,
+                            pitch = cardPitchShift
                         )
                     }
                 }
-
-                // Radar metrics and continuous real-time stream decoder
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    SpiritualRadarGauge(
-                        roll = cardRollShift,
-                        pitch = cardPitchShift,
-                        prayerName = nextPrayerName,
-                        countdownText = nextPrayerCountdown,
-                        progress = nextPrayerProgress
-                    )
-                    
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    IntelligenceTicker(
-                        text = intelligenceBrief,
-                        roll = cardRollShift,
-                        pitch = cardPitchShift
-                    )
-                }
-            }
-        } else {
+            } else {
             // TERMINAL EXTENDED MODE: Interactive Quantum Uplink Station
             Column(
                 modifier = Modifier
@@ -624,31 +631,7 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
                 }
             }
         }
-
-        // ==========================================
-        // PHASE 11 LAYER: CYBER INTEL NODES & ACADEMY
-        // ==========================================
-        AnimatedVisibility(
-            visible = isAcademyOpen,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-        ) {
-            CyberAcademyScreen(
-                viewModel = viewModel,
-                onClose = { viewModel.setAcademyOpen(false) }
-            )
-        }
-
-        AnimatedVisibility(
-            visible = isIntelNodesOpen,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-        ) {
-            IntelNodesScreen(
-                viewModel = viewModel,
-                onClose = { viewModel.setIntelNodesOpen(false) }
-            )
-        }
+    }
 
         // ==========================================
         // PHASE 5 LAYER: INVENTOR'S FORGE PANEL
@@ -1663,7 +1646,13 @@ fun BackgroundParticles(
 }
 
 @Composable
-fun StatusHeaderCell(roll: Float, pitch: Float) {
+fun StatusHeaderCell(
+    roll: Float, 
+    pitch: Float, 
+    operatorName: String, 
+    neuralRole: String, 
+    isStealth: Boolean
+) {
     Column(
         modifier = Modifier
             .graphicsLayer {
@@ -1675,28 +1664,61 @@ fun StatusHeaderCell(roll: Float, pitch: Float) {
             .wrapContentSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "A.SYRIA V4",
-            color = Color.White,
-            style = TextStyle(
-                shadow = androidx.compose.ui.graphics.Shadow(
-                    color = CyberCyan.copy(alpha = 0.85f),
-                    offset = Offset(0f, 0f),
-                    blurRadius = 15f
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "A.SYRIA V4",
+                color = Color.White,
+                style = TextStyle(
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = CyberCyan.copy(alpha = 0.85f),
+                        offset = Offset(0f, 0f),
+                        blurRadius = 15f
+                    )
+                ),
+                fontSize = 30.sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontFamily = FontFamily.Serif,
+                letterSpacing = 6.sp
+            )
+            
+            if (isStealth) {
+                Spacer(modifier = Modifier.width(8.dp))
+                androidx.compose.material3.Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Default.VisibilityOff,
+                    contentDescription = "Stealth Active",
+                    tint = Color.Gray.copy(alpha = 0.6f),
+                    modifier = Modifier.size(20.dp)
                 )
-            ),
-            fontSize = 30.sp,
-            fontWeight = FontWeight.ExtraBold,
-            fontFamily = FontFamily.Serif,
-            letterSpacing = 6.sp
-        )
+            }
+        }
+        
         Spacer(modifier = Modifier.height(4.dp))
+        
+        Text(
+            text = operatorName.uppercase(),
+            color = AmberZen,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 2.sp,
+            fontFamily = FontFamily.Monospace
+        )
+        
+        Text(
+            text = neuralRole.uppercase(),
+            color = Color.White.copy(alpha = 0.6f),
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 1.sp,
+            fontFamily = FontFamily.Monospace
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "SYSTEM STATUS: SECURE",
             color = CyberCyan,
-            fontSize = 10.sp,
+            fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
-            letterSpacing = 4.sp
+            letterSpacing = 3.sp
         )
     }
 }
@@ -2160,7 +2182,7 @@ fun IntelligenceTicker(text: String, roll: Float, pitch: Float) {
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE)
             )
         }
     }

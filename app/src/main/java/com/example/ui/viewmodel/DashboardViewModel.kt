@@ -27,6 +27,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import com.example.data.SovereignDataStore
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.net.Inet4Address
@@ -49,6 +52,19 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val alpha = 0.12f
     private var currentRoll = 0f
     private var currentPitch = 0f
+
+    private val _isAcademyGenerating = MutableStateFlow(false)
+    val isAcademyGenerating: StateFlow<Boolean> = _isAcademyGenerating.asStateFlow()
+
+    fun startSensors() {
+        accelerometer?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+        }
+    }
+
+    fun stopSensors() {
+        sensorManager.unregisterListener(this)
+    }
 
     // Sovereign Context State: Network Interface
     private val _connectionType = MutableStateFlow("Determining...")
@@ -124,24 +140,48 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val isVaultViewOpen: StateFlow<Boolean> = _isVaultViewOpen.asStateFlow()
 
     // Phase 7 Settings states and overlays
-    private val prefs = application.getSharedPreferences("asyria_settings", Context.MODE_PRIVATE)
+    private val dataStore = SovereignDataStore(application)
 
     // Phase 11: Cyber-Rank System & Academy Visibility states
-    private val _cyberScore = MutableStateFlow(prefs.getInt("cyber_score", 0))
+    private val _isArabic = MutableStateFlow(true)
+    val isArabic: StateFlow<Boolean> = _isArabic.asStateFlow()
+
+    fun setArabic(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStore.saveIsArabic(enabled)
+            fetchStrategicIntelligence()
+        }
+    }
+
+    private val _cyberScore = MutableStateFlow(0)
     val cyberScore: StateFlow<Int> = _cyberScore.asStateFlow()
 
-    val cyberRank: StateFlow<String> = _cyberScore.combine(MutableStateFlow(Unit)) { score, _ ->
-        when {
-            score < 100 -> "Novice Cipher"
-            score < 250 -> "Sentinel Guard"
-            else -> "Sovereign Ghost"
+    private val _operatorName = MutableStateFlow("Sovereign_Operator")
+    val operatorName: StateFlow<String> = _operatorName.asStateFlow()
+
+    private val _neuralRole = MutableStateFlow("Sovereign Node v4")
+    val neuralRole: StateFlow<String> = _neuralRole.asStateFlow()
+
+    val cyberRank: StateFlow<String> = combine(_cyberScore, _isArabic) { score, isAr ->
+        if (isAr) {
+            when {
+                score <= 50 -> "شيفرة مبتدئة"
+                score <= 150 -> "حارس السينتينل"
+                else -> "شبح سيادي"
+            }
+        } else {
+            when {
+                score <= 50 -> "Novice Cipher"
+                score <= 150 -> "Sentinel Guard"
+                else -> "Sovereign Ghost"
+            }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Novice Cipher")
 
-    val cyberProgress: StateFlow<Float> = _cyberScore.combine(MutableStateFlow(Unit)) { score, _ ->
+    val cyberProgress: StateFlow<Float> = combine(_cyberScore, MutableStateFlow(Unit)) { score, _ ->
         when {
-            score < 100 -> score.toFloat() / 100f
-            score < 250 -> (score - 100).toFloat() / 150f
+            score <= 50 -> (score.toFloat() / 50f).coerceIn(0f, 1f)
+            score <= 150 -> ((score - 50).toFloat() / 100f).coerceIn(0f, 1f)
             else -> 1.0f
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
@@ -149,41 +189,54 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isAcademyOpen = MutableStateFlow(false)
     val isAcademyOpen: StateFlow<Boolean> = _isAcademyOpen.asStateFlow()
 
-    private val _isIntelNodesOpen = MutableStateFlow(false)
-    val isIntelNodesOpen: StateFlow<Boolean> = _isIntelNodesOpen.asStateFlow()
+    private val _isResourcesOpen = MutableStateFlow(false)
+    val isResourcesOpen: StateFlow<Boolean> = _isResourcesOpen.asStateFlow()
 
     fun addCyberScore(points: Int) {
-        val newScore = _cyberScore.value + points
-        _cyberScore.value = newScore
-        prefs.edit().putInt("cyber_score", newScore).apply()
+        viewModelScope.launch {
+            dataStore.saveCyberScore(_cyberScore.value + points)
+        }
     }
 
     fun setAcademyOpen(open: Boolean) {
         _isAcademyOpen.value = open
     }
 
-    fun setIntelNodesOpen(open: Boolean) {
-        _isIntelNodesOpen.value = open
+    fun setResourcesOpen(open: Boolean) {
+        _isResourcesOpen.value = open
     }
 
-    private val _isStealthMode = MutableStateFlow(prefs.getBoolean("stealth_mode", false))
+    private val _isStealthMode = MutableStateFlow(false)
     val isStealthMode: StateFlow<Boolean> = _isStealthMode.asStateFlow()
 
-    private val _customApiKey = MutableStateFlow(prefs.getString("custom_api_key", "") ?: "")
+    private val _customApiKey = MutableStateFlow("")
     val customApiKey: StateFlow<String> = _customApiKey.asStateFlow()
 
     private val _isSettingsOpen = MutableStateFlow(false)
     val isSettingsOpen: StateFlow<Boolean> = _isSettingsOpen.asStateFlow()
 
     fun setStealthMode(enabled: Boolean) {
-        _isStealthMode.value = enabled
-        prefs.edit().putBoolean("stealth_mode", enabled).apply()
+        viewModelScope.launch {
+            dataStore.saveStealthMode(enabled)
+        }
     }
 
     fun updateCustomApiKey(key: String) {
-        _customApiKey.value = key
-        prefs.edit().putString("custom_api_key", key).apply()
-        initializeGenerativeModel()
+        viewModelScope.launch {
+            dataStore.saveGeminiApiKey(key)
+        }
+    }
+
+    fun updateOperatorName(name: String) {
+        viewModelScope.launch {
+            dataStore.saveOperatorName(name)
+        }
+    }
+
+    fun updateNeuralRole(role: String) {
+        viewModelScope.launch {
+            dataStore.saveNeuralRole(role)
+        }
     }
 
     fun setSettingsOpen(open: Boolean) {
@@ -273,6 +326,28 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         application.registerReceiver(batteryReceiver, filter)
 
         // Spawn central ticker loop for active counters and state poller
+        viewModelScope.launch {
+            dataStore.isArabic.collect { _isArabic.value = it }
+        }
+        viewModelScope.launch {
+            dataStore.stealthMode.collect { _isStealthMode.value = it }
+        }
+        viewModelScope.launch {
+            dataStore.cyberScore.collect { _cyberScore.value = it }
+        }
+        viewModelScope.launch {
+            dataStore.geminiApiKey.collect { 
+                _customApiKey.value = it 
+                initializeGenerativeModel()
+            }
+        }
+        viewModelScope.launch {
+            dataStore.operatorName.collect { _operatorName.value = it }
+        }
+        viewModelScope.launch {
+            dataStore.neuralRole.collect { _neuralRole.value = it }
+        }
+        
         startNeuralServices()
     }
 
@@ -523,23 +598,41 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     // Task 1: Fetch short strategic intelligence brief from Gemini (or crisp offline source)
     fun fetchStrategicIntelligence() {
         viewModelScope.launch {
+            val isAr = _isArabic.value
             val model = generativeModel
             if (model != null) {
                 try {
-                    val prompt = "Provide a single, short Android security warning or technology brief. Limit answer strictly to 15 words or less, direct tone, no fluff."
+                    val promptLocale = if (isAr) "Arabic (العربية)" else "English"
+                    val prompt = "Provide a single, very short daily security alert or threat insight about a modern device hazard (such as WhatsApp hijacking, public charging port dangers / juice jacking, fake Wi-Fi, malicious QR codes) formatted in $promptLocale. Limit output to exactly 12 words or less. Do not use quotes, markdown or introductory text."
                     val res = model.generateContent(prompt).text ?: ""
                     val cleanRes = res.trim().replace("\n", " ")
                     if (cleanRes.isNotEmpty()) {
-                        _intelligenceBrief.value = "[INTEL_UPLINK] > $cleanRes"
+                        _intelligenceBrief.value = "[!] ALERT: $cleanRes"
                         return@launch
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
             }
-            // Fallback to offline decrypt brief if model generates empty or throws Exception
-            val randomBrief = offlineBriefs[Random.nextInt(offlineBriefs.size)]
-            _intelligenceBrief.value = "[INTEL_UPLINK] > $randomBrief"
+            // Fallback to offline decrypt brief in correct language if model generates empty or throws Exception
+            val fallbackInsight = if (isAr) {
+                val list = listOf(
+                    "تجنب منافذ الشحن العامة بالمطارات لحماية جهازك الرقمي من الاختراقات السلكية الحيوية.",
+                    "الهندسة الاجتماعية المتقدمة تستهدف مستخدمي كود واتساب للتلفيق واستلام حساباتهم.",
+                    "تجنب الاتصال بشبكات الواي فاي العامة دون تفعيل نفق اتصال مشفر مسبقاً.",
+                    "امسح فقط الأكواد التفاعلية QR المضمونة لتفادي برمجيات الفيشينغ الخبيثة التلقائية."
+                )
+                list[Random.nextInt(list.size)]
+            } else {
+                val list = listOf(
+                    "Avoid public charging ports (Juice Jacking) to secure local device data hardware.",
+                    "Advanced social engineering vectors target active WhatsApp authentication pins.",
+                    "Do not connect to secondary public Wi-Fi zones without VPN tunnels verified.",
+                    "QR code phishing (Quishing) executes automatic remote malicious software payloads."
+                )
+                list[Random.nextInt(list.size)]
+            }
+            _intelligenceBrief.value = "[!] ALERT: $fallbackInsight"
         }
     }
 
@@ -580,22 +673,30 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Phase 11: Dynamic Scenario Generation using Gemini API
-    fun generateAcademyScenarios(onSuccess: (String) -> Unit, onFailure: (Throwable) -> Unit) {
+    // Phase 12: Dynamic Syllabus Module Scenario Generation using Gemini API
+    fun generateAcademyScenarios(
+        moduleNameEn: String,
+        moduleNameAr: String,
+        useArabic: Boolean,
+        onSuccess: (String) -> Unit,
+        onFailure: (Throwable) -> Unit
+    ) {
         viewModelScope.launch {
             val model = generativeModel
             if (model != null) {
                 try {
+                    val promptLocale = if (useArabic) "Arabic (العربية)" else "English"
                     val prompt = """
-                        Generate 3 unique, highly realistic cybersecurity threat scenarios in Arabic. 
-                        Each scenario should include: A description of the threat, 4 multiple-choice options, and the correct answer index (0-3). 
-                        Focus on modern threats like AI voice cloning, QR code phishing, and social engineering. 
-                        Format the response strictly as a JSON object inside a 'scenarios' key. Do not output anything other than standard JSON.
+                        Generate 3 unique, highly realistic cybersecurity threat scenarios based on real-world breaches for the specific syllabus module: '$moduleNameEn' / '$moduleNameAr'.
+                        Focus on major real-world attacks/vulnerabilities related to this topic.
+                        Display everything strictly in $promptLocale.
+                        Each scenario should include: A description of the threat scenario, 4 multiple-choice options, and the correct answer index (0-3).
+                        Format the response strictly as a JSON object inside a 'scenarios' key. Do not output anything other than standard JSON. No markdown backticks.
                         JSON Schema:
                         {
                           "scenarios": [
                             {
-                              "description": "Arabic threat description...",
+                              "description": "Realistic scenario description...",
                               "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
                               "correct_index": 0
                             }
@@ -603,8 +704,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         }
                     """.trimIndent()
                     val res = model.generateContent(prompt).text ?: ""
-                    if (res.isNotBlank()) {
-                        onSuccess(res)
+                    // Remove markdown wrapper if any
+                    val cleanRes = res.replace("```json", "").replace("```", "").trim()
+                    if (cleanRes.isNotBlank()) {
+                        onSuccess(cleanRes)
                         return@launch
                     }
                 } catch (e: Exception) {
@@ -616,16 +719,17 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Phase 11: Adaptive Learning Feedback via Strategic Debrief
-    fun generateStrategicDebrief(scenario: String, choiceText: String, onResponse: (String) -> Unit) {
+    // Phase 12: Adaptive Learning Feedback via Strategic Debrief with bilingual support
+    fun generateStrategicDebrief(scenario: String, choiceText: String, useArabic: Boolean, onResponse: (String) -> Unit) {
         viewModelScope.launch {
             val model = generativeModel
             if (model != null) {
                 try {
+                    val promptLocale = if (useArabic) "Arabic (العربية)" else "English"
                     val prompt = """
                         The user chose '$choiceText' for the cybersecurity scenario: '$scenario'. 
                         Explain why this choice is Secure or Insecure, and give a one-sentence tip to prevent this in real life.
-                        Output the response strictly in Arabic. Limit your explanation to 60 words. No introduction.
+                        Output the response strictly in $promptLocale. Limit your explanation to 60 words. No introduction.
                     """.trimIndent()
                     val res = model.generateContent(prompt).text ?: ""
                     if (res.isNotBlank()) {
