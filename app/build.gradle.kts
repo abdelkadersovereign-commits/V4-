@@ -1,15 +1,25 @@
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.android)
-  alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
   alias(libs.plugins.secrets)
 }
 
 android {
+  configurations.all {
+    resolutionStrategy {
+      force("org.jetbrains.kotlin:kotlin-stdlib:1.9.24")
+      force("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24")
+      force("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.24")
+    }
+  }
   namespace = "com.asyria.v4"
   compileSdk = 34
+  
+  composeOptions {
+    kotlinCompilerExtensionVersion = "1.5.14"
+  }
 
   defaultConfig {
     applicationId = "com.asyria.v4"
@@ -53,8 +63,8 @@ android {
       if (keystoreFile.exists()) {
         signingConfig = signingConfigs.getByName("debugConfig")
       }
-      isMinifyEnabled = true
-      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+      isMinifyEnabled = false
+      isShrinkResources = false
     }
   }
   compileOptions {
@@ -81,6 +91,11 @@ secrets {
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
+  constraints {
+      implementation("org.jetbrains.kotlin:kotlin-metadata-jvm:0.9.0") {
+          because("R8 version in AGP 8.4.0 does not support Kotlin Metadata 2.1.0 yet")
+      }
+  }
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)
