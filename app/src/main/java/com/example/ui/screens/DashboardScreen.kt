@@ -487,16 +487,7 @@ fun DashboardScreen(
                     }
 
                     item {
-                        SpiritualRadarGauge(
-                            roll = cardRollShift,
-                            pitch = cardPitchShift,
-                            prayerName = nextPrayerName,
-                            countdownText = nextPrayerCountdown,
-                            progress = nextPrayerProgress,
-                            qiblaAngle = qiblaDirection,
-                            pulseAlpha = hudPulseAlpha,
-                            azimuth = azimuth
-                        )
+                        Spacer(modifier = Modifier.height(100.dp))
                     }
 
                     item {
@@ -580,7 +571,7 @@ fun DashboardScreen(
 
                                 Text(
                                     text = if (terminalResponse.isEmpty() && !isThinking) {
-                                        if (isAr) "محطة التشفير جاهزة. بانتظار استعلام الهوية..." else "TERMINAL READY. AWAITING CORE QUERY..."
+                                        if (isAr) "محطة التشفير جاهزة.\nبناء وتطوير: ABOUDA.AL.SHEKH.YOSSEF\nبانتظار استعلام الهوية..." else "TERMINAL READY.\nEngineered by: ABOUDA.AL.SHEKH.YOSSEF\nAWAITING CORE QUERY..."
                                     } else {
                                         terminalResponse + (if (isThinking || terminalResponse.isNotEmpty()) " " else "")
                                     },
@@ -646,6 +637,17 @@ fun DashboardScreen(
                         Icon(imageVector = Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = VoidBlack)
                     }
                 }
+            }
+        }
+
+        if (!isTerminalExpanded) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 16.dp)
+            ) {
+                RadiantDigitalClock(prayerName = nextPrayerName, isAr = isAr)
             }
         }
 
@@ -2268,83 +2270,88 @@ fun QiblaCompass(
     }
 }
 
-// Phase 20: Cinematic Spiritual HUD with Circular Gauge
+// Phase 22: High-End Radiant Digital Neon Clock
 @Composable
-fun SpiritualRadarGauge(
-    roll: Float,
-    pitch: Float,
-    prayerName: String,
-    countdownText: String,
-    progress: Float,
-    qiblaAngle: Double,
-    pulseAlpha: Float,
-    azimuth: Float
-) {
+fun RadiantDigitalClock(prayerName: String, isAr: Boolean) {
+    var currentTime by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        val sdf = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.ENGLISH)
+        while (true) {
+            currentTime = sdf.format(java.util.Date())
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "neonPulse")
+    val bloomScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "bloomScale"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(280.dp)
-            .graphicsLayer {
-                rotationX = -pitch * 0.45f
-                rotationY = roll * 0.45f
-            },
+            .height(100.dp)
+            .background(
+                color = Color.Black.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+            )
+            .border(
+                1.dp,
+                CyberCyan.copy(alpha = 0.3f),
+                RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+            ),
         contentAlignment = Alignment.Center
     ) {
-        // Circular Progress Gauge for Prayer
-        Canvas(modifier = Modifier.size(240.dp).alpha(0.3f * pulseAlpha)) {
-            // Background ring
-            drawArc(
-                color = CyberCyan.copy(alpha = 0.1f),
-                startAngle = 0f,
-                sweepAngle = 360f,
-                useCenter = false,
-                style = Stroke(width = 8.dp.toPx())
-            )
-            // Progress arc
-            drawArc(
-                color = CyberCyan,
-                startAngle = -90f,
-                sweepAngle = 360 * progress,
-                useCenter = false,
-                style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
-            )
-            
-            // Glowing border
-            drawArc(
-                color = CyberCyan.copy(alpha = 0.5f),
-                startAngle = -90f,
-                sweepAngle = 360 * progress,
-                useCenter = false,
-                style = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f)))
-            )
+        // CRT Scanlines Effect
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val linesCount = 20
+            val lineSpacing = size.height / linesCount
+            for (i in 0..linesCount) {
+                drawLine(
+                    color = CyberCyan.copy(alpha = 0.05f),
+                    start = androidx.compose.ui.geometry.Offset(0f, i * lineSpacing),
+                    end = androidx.compose.ui.geometry.Offset(size.width, i * lineSpacing),
+                    strokeWidth = 1f
+                )
+            }
         }
 
-        // Advanced 3D Qibla Compass Layer
-        QiblaCompass(
-            azimuth = azimuth,
-            qiblaAngle = qiblaAngle,
-            roll = roll,
-            pitch = pitch,
-            pulseAlpha = pulseAlpha
-        )
-
-        // Prayer Info Overlay (Centralized inside/around the ring)
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.offset(y = 100.dp) // Offset to sit below the compass center
+            verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "NEXT UPLINK: ${prayerName.uppercase()} // T-MINUS: $countdownText",
-                color = CyberCyan.copy(alpha = pulseAlpha),
+                text = if (isAr) "[ $prayerName القادم ]" else "[ NEXT UPLINK: $prayerName ]",
+                color = CyberCyan.copy(alpha = 0.8f),
                 fontSize = 11.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 1.sp,
-                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
+                letterSpacing = 2.sp
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Text(
+                text = currentTime,
+                color = CyberCyan,
+                fontSize = 42.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Light,
+                letterSpacing = 4.sp,
+                modifier = Modifier.graphicsLayer {
+                    scaleX = bloomScale
+                    scaleY = bloomScale
+                },
                 style = TextStyle(
                     shadow = androidx.compose.ui.graphics.Shadow(
-                        color = CyberCyan.copy(alpha = 0.4f),
-                        blurRadius = 10f
+                        color = CyberCyan.copy(alpha = 0.8f),
+                        blurRadius = 25f * bloomScale
                     )
                 )
             )

@@ -20,6 +20,7 @@ import com.example.data.database.InventorIdeaRepository
 import com.example.data.database.SovereigntyCipher
 import com.example.data.ContextualVerseEngine
 import com.google.ai.client.generativeai.GenerativeModel
+import com.google.ai.client.generativeai.type.RequestOptions
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,9 +33,17 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.Calendar
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
 class DashboardViewModel(application: Application) : AndroidViewModel(application), SensorEventListener {
@@ -235,21 +244,136 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isStealthMode = MutableStateFlow(false)
     val isStealthMode: StateFlow<Boolean> = _isStealthMode.asStateFlow()
 
+    private val _isNeuralProxy = MutableStateFlow(false)
+    val isNeuralProxy: StateFlow<Boolean> = _isNeuralProxy.asStateFlow()
+
     private val _customApiKey = MutableStateFlow("")
     val customApiKey: StateFlow<String> = _customApiKey.asStateFlow()
+
+    private val _projectName = MutableStateFlow("")
+    val projectName: StateFlow<String> = _projectName.asStateFlow()
+
+    private val _projectId = MutableStateFlow("")
+    val projectId: StateFlow<String> = _projectId.asStateFlow()
+
+    private val _projectNumber = MutableStateFlow("")
+    val projectNumber: StateFlow<String> = _projectNumber.asStateFlow()
 
     private val _isSettingsOpen = MutableStateFlow(false)
     val isSettingsOpen: StateFlow<Boolean> = _isSettingsOpen.asStateFlow()
 
+    private val okHttpClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .build()
+
+    private suspend fun generateContentSafely(prompt: String): String {
+        return withContext(Dispatchers.IO) {
+            val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
+            if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") throw Exception("Error 401: Invalid Key")
+
+            val useProxy = _isNeuralProxy.value
+            val model = generativeModel
+
+            try {
+                if (useProxy || model == null) {
+                    executeNeuralProxyRequest(prompt, apiKey)
+                } else {
+                    val res = model.generateContent(prompt).text ?: ""
+                    res
+                }
+            } catch (e: Exception) {
+                if (!useProxy && model != null) {
+                    // Implicit fallback
+                    executeNeuralProxyRequest(prompt, apiKey)
+                } else {
+                    throw e
+                }
+            }
+        }
+    }
+
+    private fun executeNeuralProxyRequest(prompt: String, apiKey: String): String {
+        val json = JSONObject().apply {
+            put("contents", org.json.JSONArray().put(
+                JSONObject().apply {
+                    put("parts", org.json.JSONArray().put(
+                        JSONObject().put("text", prompt)
+                    ))
+                }
+            ))
+        }
+        val body = json.toString().toRequestBody("application/json".toMediaType())
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey"
+        
+        val requestBuilder = Request.Builder().url(url).post(body)
+        
+        // Phase 23: Complete Project Identity Integration (The 4-Key Protocol)
+        if (_projectName.value.isNotBlank()) {
+            // Include project name context in metadata or header if necessary
+        }
+        if (_projectId.value.isNotBlank()) {
+            requestBuilder.header("x-goog-project-id", _projectId.value)
+        }
+        if (_projectNumber.value.isNotBlank()) {
+            requestBuilder.header("x-goog-project-number", _projectNumber.value)
+        }
+        val sovereignId = "${_projectId.value}:${_projectNumber.value}"
+        requestBuilder.header("x-sovereign-identity", sovereignId)
+        
+        val request = requestBuilder.build()
+        val response = okHttpClient.newCall(request).execute()
+        
+        if (!response.isSuccessful) {
+            val code = response.code
+            throw Exception(if (code == 403) "Error 403: Regional Block" else if (code == 401) "Error 401: Invalid Key" else "Error $code")
+        }
+        
+        val resBody = response.body?.string() ?: ""
+        val jsonRes = JSONObject(resBody)
+        return jsonRes.getJSONArray("candidates")
+            .getJSONObject(0)
+            .getJSONObject("content")
+            .getJSONArray("parts")
+            .getJSONObject(0)
+            .getString("text")
+    }
+
     fun setStealthMode(enabled: Boolean) {
         viewModelScope.launch {
             dataStore.saveStealthMode(enabled)
+            _isStealthMode.value = enabled
+        }
+    }
+
+    fun setNeuralProxy(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStore.saveNeuralProxy(enabled)
+            _isNeuralProxy.value = enabled
         }
     }
 
     fun updateCustomApiKey(key: String) {
         viewModelScope.launch {
             dataStore.saveGeminiApiKey(key)
+        }
+    }
+
+    fun updateProjectName(name: String) {
+        viewModelScope.launch {
+            dataStore.saveProjectName(name)
+        }
+    }
+
+    fun updateProjectId(id: String) {
+        viewModelScope.launch {
+            dataStore.saveProjectId(id)
+        }
+    }
+
+    fun updateProjectNumber(number: String) {
+        viewModelScope.launch {
+            dataStore.saveProjectNumber(number)
         }
     }
 
@@ -343,20 +467,26 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     fun testNeuralLink() {
         viewModelScope.launch {
             _isTestingKey.value = true
-            val model = generativeModel
-            if (model == null) {
+            val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
+            if (apiKey.isEmpty() || apiKey.contains("MY_GEMINI_API_KEY") || _projectName.value.isBlank() || _projectId.value.isBlank() || _projectNumber.value.isBlank()) {
                 _isNeuralLinkOffline.value = true
+                _terminalResponse.value = "[ TERMINAL ALERT ] All Project Identity Fields (API Key, Project Name, ID, Number) are required."
                 _isTestingKey.value = false
                 return@launch
             }
 
             try {
                 kotlinx.coroutines.withTimeout(10000) {
-                    model.generateContent("ping")
+                    generateContentSafely("ping")
                 }
                 _isNeuralLinkOffline.value = false
+                _terminalResponse.value = "Neural Link Established."
             } catch (e: Exception) {
                 _isNeuralLinkOffline.value = true
+                val err = if (e.message?.contains("403") == true) "Error 403: Regional Block"
+                        else if (e.message?.contains("401") == true) "Error 401: Invalid Key"
+                        else "Error: ${e.message}"
+                _terminalResponse.value = "[ TERMINAL ALERT ] $err"
             } finally {
                 _isTestingKey.value = false
             }
@@ -391,10 +521,22 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
         viewModelScope.launch {
+            dataStore.projectName.collect { _projectName.value = it }
+        }
+        viewModelScope.launch {
+            dataStore.projectId.collect { _projectId.value = it }
+        }
+        viewModelScope.launch {
+            dataStore.projectNumber.collect { _projectNumber.value = it }
+        }
+        viewModelScope.launch {
             dataStore.operatorName.collect { _operatorName.value = it }
         }
         viewModelScope.launch {
             dataStore.neuralRole.collect { _neuralRole.value = it }
+        }
+        viewModelScope.launch {
+            dataStore.neuralProxy.collect { _isNeuralProxy.value = it }
         }
         
         startNeuralServices()
@@ -500,7 +642,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         List required technical components, and potential security risks. Format it as a professional engineering blueprint. Limit your response strictly to 180 words.
                     """.trimIndent()
 
-                    val res = model.generateContent(prompt).text
+                    val res = generateContentSafely(prompt)
                     if (!res.isNullOrEmpty()) {
                         generatedBlueprint = res.trim()
                     }
@@ -594,7 +736,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     kotlinx.coroutines.withTimeout(15000) {
                         val promptLocale = if (isAr) "Arabic (العربية)" else "English"
                         val prompt = "Provide a single, very short daily security alert or threat insight about a modern device hazard (such as WhatsApp hijacking, public charging port dangers / juice jacking, fake Wi-Fi, malicious QR codes) formatted in $promptLocale. Limit output to exactly 12 words or less. Do not use quotes, markdown or introductory text."
-                        val res = model.generateContent(prompt).text ?: ""
+                        val res = generateContentSafely(prompt)
                         val cleanRes = res.trim().replace("\n", " ")
                         if (cleanRes.isNotEmpty()) {
                             _intelligenceBrief.value = "[!] ALERT: $cleanRes"
@@ -644,9 +786,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             if (model != null) {
                 try {
                     kotlinx.coroutines.withTimeout(15000) {
-                        val res = model.generateContent(
+                        val res = generateContentSafely(
                             "You are the high-end A.SYRIA V4 brain. Analyze the following project idea or question comprehensively and give a tactical security security brief style response. Under 50 words: $query"
-                        ).text
+                        )
                         if (!res.isNullOrEmpty()) {
                             rawResponse = res.trim()
                         }
@@ -710,7 +852,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                           ]
                         }
                     """.trimIndent()
-                    val res = model.generateContent(prompt).text ?: ""
+                    val res = generateContentSafely(prompt)
                     // Remove markdown wrapper if any
                     val cleanRes = res.replace("```json", "").replace("```", "").trim()
                     if (cleanRes.isNotBlank()) {
@@ -741,7 +883,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         Explain why this choice is Secure or Insecure, and give a one-sentence tip to prevent this in real life.
                         Output the response strictly in $promptLocale. Limit your explanation to 60 words. No introduction.
                     """.trimIndent()
-                    val res = model.generateContent(prompt).text ?: ""
+                    val res = generateContentSafely(prompt)
                     if (res.isNotBlank()) {
                         onResponse(res.trim())
                         return@launch
@@ -761,8 +903,20 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             
             val model = generativeModel
             val isAr = _isArabic.value
+
+            // Background Scanning Optimization: perform a HEAD request
+            var linkStatus = "Unknown"
+            try {
+                withContext(Dispatchers.IO) {
+                    val headRequest = Request.Builder().url(url).head().build()
+                    val response = okHttpClient.newCall(headRequest).execute()
+                    linkStatus = if (response.isSuccessful) "Active/Reachable (HTTP ${response.code})" else "Unreachable/Blocked (HTTP ${response.code})"
+                }
+            } catch (e: Exception) {
+                linkStatus = "Failed to reach (${e.message})"
+            }
             
-            if (model != null) {
+            if (model != null || _isNeuralProxy.value) {
                 try {
                     kotlinx.coroutines.withTimeout(20000) {
                         val promptLocale = if (isAr) "Arabic (العربية)" else "English"
@@ -770,6 +924,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                             Analyze the security of this resource link:
                             Title: $resourceTitle
                             URL: $url
+                            HTTP Status Check: $linkStatus
                             
                             Provide a Neural Risk Analysis including: 
                             1. Safety Score (0-100)
@@ -779,8 +934,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                             Output format strictly in $promptLocale. Limit to 80 words. Focus on being tactile and sovereign.
                         """.trimIndent()
                         
-                        val res = model.generateContent(prompt).text
-                        _linkAnalysisResult.value = res?.trim()
+                        val res = generateContentSafely(prompt)
+                        _linkAnalysisResult.value = res.trim()
                     }
                     _isNeuralLinkOffline.value = false
                 } catch (e: Exception) {

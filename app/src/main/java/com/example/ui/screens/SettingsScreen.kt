@@ -44,7 +44,11 @@ fun SettingsScreen(
     val haptic = LocalHapticFeedback.current
     val isAr by viewModel.isArabic.collectAsState()
     val isStealth by viewModel.isStealthMode.collectAsState()
+    val isNeuralProxy by viewModel.isNeuralProxy.collectAsState()
     val apiKey by viewModel.customApiKey.collectAsState()
+    val projectName by viewModel.projectName.collectAsState()
+    val projectId by viewModel.projectId.collectAsState()
+    val projectNumber by viewModel.projectNumber.collectAsState()
     val operatorName by viewModel.operatorName.collectAsState()
     val neuralRole by viewModel.neuralRole.collectAsState()
     
@@ -61,6 +65,9 @@ fun SettingsScreen(
     var tempOperatorName by remember(operatorName) { mutableStateOf(operatorName) }
     var tempNeuralRole by remember(neuralRole) { mutableStateOf(neuralRole) }
     var tempApiKey by remember(apiKey) { mutableStateOf(apiKey) }
+    var tempProjectName by remember(projectName) { mutableStateOf(projectName) }
+    var tempProjectId by remember(projectId) { mutableStateOf(projectId) }
+    var tempProjectNumber by remember(projectNumber) { mutableStateOf(projectNumber) }
 
     CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
         Box(
@@ -188,6 +195,39 @@ fun SettingsScreen(
                     isPassword = true
                 )
 
+                CyberTextField(
+                    label = if (isAr) "اسم المشروع" else "PROJECT NAME",
+                    value = tempProjectName,
+                    onValueChange = { 
+                        tempProjectName = it
+                        viewModel.updateProjectName(it)
+                    },
+                    isAr = isAr,
+                    isPassword = false
+                )
+
+                CyberTextField(
+                    label = if (isAr) "معرف المشروع" else "PROJECT ID",
+                    value = tempProjectId,
+                    onValueChange = { 
+                        tempProjectId = it
+                        viewModel.updateProjectId(it)
+                    },
+                    isAr = isAr,
+                    isPassword = false
+                )
+
+                CyberTextField(
+                    label = if (isAr) "رقم المشروع" else "PROJECT NUMBER",
+                    value = tempProjectNumber,
+                    onValueChange = { 
+                        tempProjectNumber = it
+                        viewModel.updateProjectNumber(it)
+                    },
+                    isAr = isAr,
+                    isPassword = false
+                )
+
                 Button(
                     onClick = { viewModel.testNeuralLink() },
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
@@ -201,7 +241,7 @@ fun SettingsScreen(
                     } else {
                         val statusText = if (isNeuralLinkOffline) 
                             (if (isAr) "فشل الاتصال: اختبار الرابط" else "LINK OFFLINE: TEST UPLINK")
-                            else (if (isAr) "الاتصال مستقر: إعادة الاختبار" else "LINK STABLE: RETEST UPLINK")
+                            else "FULL NEURAL LINK ESTABLISHED ✅"
                             
                         Text(
                             text = statusText,
@@ -237,6 +277,17 @@ fun SettingsScreen(
                     },
                     icon = if (isStealth) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                     tint = if (isStealth) Color.Gray else CyberCyan
+                )
+
+                SettingsToggle(
+                    label = if (isAr) "Neural Proxy (تجاوز الحظر)" else "Neural Proxy Bypass",
+                    checked = isNeuralProxy,
+                    onCheckedChange = { 
+                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                        viewModel.setNeuralProxy(it) 
+                    },
+                    icon = Icons.Default.Security,
+                    tint = if (isNeuralProxy) CyberCyan else Color.White
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
