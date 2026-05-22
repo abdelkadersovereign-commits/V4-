@@ -92,9 +92,7 @@ secrets {
 // This makes it easy to add them back in the future if needed.
 dependencies {
   constraints {
-      implementation("org.jetbrains.kotlin:kotlin-metadata-jvm:0.9.0") {
-          because("R8 version in AGP 8.4.0 does not support Kotlin Metadata 2.1.0 yet")
-      }
+      implementation("org.jetbrains.kotlin:kotlin-metadata-jvm:0.9.0")
   }
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
