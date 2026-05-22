@@ -134,6 +134,13 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
     val isForgePanelOpen by viewModel.isForgePanelOpen.collectAsState()
     val isVaultViewOpen by viewModel.isVaultViewOpen.collectAsState()
 
+    // Phase 11 states
+    val cyberScore by viewModel.cyberScore.collectAsState()
+    val cyberRank by viewModel.cyberRank.collectAsState()
+    val cyberProgress by viewModel.cyberProgress.collectAsState()
+    val isAcademyOpen by viewModel.isAcademyOpen.collectAsState()
+    val isIntelNodesOpen by viewModel.isIntelNodesOpen.collectAsState()
+
     val forgeTitle by viewModel.forgeTitle.collectAsState()
     val forgeCategory by viewModel.forgeCategory.collectAsState()
     val forgeIdea by viewModel.forgeIdea.collectAsState()
@@ -260,6 +267,17 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
                         insight = ambientInsight,
                         modifier = Modifier.padding(horizontal = 4.dp)
                     )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Phase 11: Glowing Cyber-Rank tracker bar
+                    CyberRankMetricBar(
+                        score = cyberScore,
+                        rank = cyberRank,
+                        progress = cyberProgress,
+                        roll = cardRollShift,
+                        pitch = cardPitchShift
+                    )
                 }
 
                 // Core Main Space Interface
@@ -341,6 +359,39 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
                             onClick = {
                                 haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
                                 viewModel.setVaultViewOpen(true)
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Phase 11 secondary controllers
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp)
+                            .graphicsLayer {
+                                rotationX = -cardPitchShift * 0.7f
+                                rotationY = cardRollShift * 0.7f
+                            },
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        TacticalGridButton(
+                            text = "[ NEURAL ACADEMY ]",
+                            color = CyberCyan,
+                            onClick = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                viewModel.setAcademyOpen(true)
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                        TacticalGridButton(
+                            text = "[ INTEL NODES ]",
+                            color = AmberZen,
+                            onClick = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                viewModel.setIntelNodesOpen(true)
                             },
                             modifier = Modifier.weight(1f)
                         )
@@ -572,6 +623,31 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
                     }
                 }
             }
+        }
+
+        // ==========================================
+        // PHASE 11 LAYER: CYBER INTEL NODES & ACADEMY
+        // ==========================================
+        AnimatedVisibility(
+            visible = isAcademyOpen,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+        ) {
+            CyberAcademyScreen(
+                viewModel = viewModel,
+                onClose = { viewModel.setAcademyOpen(false) }
+            )
+        }
+
+        AnimatedVisibility(
+            visible = isIntelNodesOpen,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+        ) {
+            IntelNodesScreen(
+                viewModel = viewModel,
+                onClose = { viewModel.setIntelNodesOpen(false) }
+            )
         }
 
         // ==========================================
@@ -2089,3 +2165,88 @@ fun IntelligenceTicker(text: String, roll: Float, pitch: Float) {
         }
     }
 }
+
+// Phase 11: Glowing Cyber-Rank tracking bar
+@Composable
+fun CyberRankMetricBar(
+    score: Int,
+    rank: String,
+    progress: Float,
+    roll: Float,
+    pitch: Float
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp)
+            .graphicsLayer {
+                rotationX = -pitch * 0.4f
+                rotationY = roll * 0.4f
+            }
+            .border(
+                width = 0.5.dp,
+                color = CyberCyan.copy(alpha = 0.3f),
+                shape = RoundedCornerShape(10.dp)
+            )
+            .background(Color.White.copy(alpha = 0.02f), RoundedCornerShape(10.dp))
+            .padding(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "CYBER RANK: [${rank.uppercase()}]",
+                    color = CyberCyan,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    style = TextStyle(
+                        shadow = androidx.compose.ui.graphics.Shadow(
+                            color = CyberCyan.copy(alpha = 0.6f),
+                            offset = Offset(0f, 0f),
+                            blurRadius = 6f
+                        )
+                    )
+                )
+                Text(
+                    text = "ACTIVE TESTING PROTOCOL",
+                    color = Color.White.copy(alpha = 0.4f),
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Text(
+                text = "$score PTS",
+                color = AmberZen,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        // Glowing Progress Bar Line
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(2.dp))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progress)
+                    .fillMaxHeight()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(CyberCyan, CyberCyan.copy(alpha = 0.4f))
+                        ),
+                        RoundedCornerShape(2.dp)
+                    )
+            )
+        }
+    }
+}
+

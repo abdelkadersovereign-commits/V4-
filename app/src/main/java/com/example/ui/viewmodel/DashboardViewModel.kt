@@ -126,6 +126,46 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     // Phase 7 Settings states and overlays
     private val prefs = application.getSharedPreferences("asyria_settings", Context.MODE_PRIVATE)
 
+    // Phase 11: Cyber-Rank System & Academy Visibility states
+    private val _cyberScore = MutableStateFlow(prefs.getInt("cyber_score", 0))
+    val cyberScore: StateFlow<Int> = _cyberScore.asStateFlow()
+
+    val cyberRank: StateFlow<String> = _cyberScore.combine(MutableStateFlow(Unit)) { score, _ ->
+        when {
+            score < 100 -> "Novice Cipher"
+            score < 250 -> "Sentinel Guard"
+            else -> "Sovereign Ghost"
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Novice Cipher")
+
+    val cyberProgress: StateFlow<Float> = _cyberScore.combine(MutableStateFlow(Unit)) { score, _ ->
+        when {
+            score < 100 -> score.toFloat() / 100f
+            score < 250 -> (score - 100).toFloat() / 150f
+            else -> 1.0f
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
+
+    private val _isAcademyOpen = MutableStateFlow(false)
+    val isAcademyOpen: StateFlow<Boolean> = _isAcademyOpen.asStateFlow()
+
+    private val _isIntelNodesOpen = MutableStateFlow(false)
+    val isIntelNodesOpen: StateFlow<Boolean> = _isIntelNodesOpen.asStateFlow()
+
+    fun addCyberScore(points: Int) {
+        val newScore = _cyberScore.value + points
+        _cyberScore.value = newScore
+        prefs.edit().putInt("cyber_score", newScore).apply()
+    }
+
+    fun setAcademyOpen(open: Boolean) {
+        _isAcademyOpen.value = open
+    }
+
+    fun setIntelNodesOpen(open: Boolean) {
+        _isIntelNodesOpen.value = open
+    }
+
     private val _isStealthMode = MutableStateFlow(prefs.getBoolean("stealth_mode", false))
     val isStealthMode: StateFlow<Boolean> = _isStealthMode.asStateFlow()
 
@@ -537,6 +577,66 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 _terminalResponse.value = rawResponse.substring(0, i)
                 delay(30) // Elegant tech delay representing live uplink stream
             }
+        }
+    }
+
+    // Phase 11: Dynamic Scenario Generation using Gemini API
+    fun generateAcademyScenarios(onSuccess: (String) -> Unit, onFailure: (Throwable) -> Unit) {
+        viewModelScope.launch {
+            val model = generativeModel
+            if (model != null) {
+                try {
+                    val prompt = """
+                        Generate 3 unique, highly realistic cybersecurity threat scenarios in Arabic. 
+                        Each scenario should include: A description of the threat, 4 multiple-choice options, and the correct answer index (0-3). 
+                        Focus on modern threats like AI voice cloning, QR code phishing, and social engineering. 
+                        Format the response strictly as a JSON object inside a 'scenarios' key. Do not output anything other than standard JSON.
+                        JSON Schema:
+                        {
+                          "scenarios": [
+                            {
+                              "description": "Arabic threat description...",
+                              "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+                              "correct_index": 0
+                            }
+                          ]
+                        }
+                    """.trimIndent()
+                    val res = model.generateContent(prompt).text ?: ""
+                    if (res.isNotBlank()) {
+                        onSuccess(res)
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    onFailure(e)
+                    return@launch
+                }
+            }
+            onFailure(Exception("Model offline or unavailable"))
+        }
+    }
+
+    // Phase 11: Adaptive Learning Feedback via Strategic Debrief
+    fun generateStrategicDebrief(scenario: String, choiceText: String, onResponse: (String) -> Unit) {
+        viewModelScope.launch {
+            val model = generativeModel
+            if (model != null) {
+                try {
+                    val prompt = """
+                        The user chose '$choiceText' for the cybersecurity scenario: '$scenario'. 
+                        Explain why this choice is Secure or Insecure, and give a one-sentence tip to prevent this in real life.
+                        Output the response strictly in Arabic. Limit your explanation to 60 words. No introduction.
+                    """.trimIndent()
+                    val res = model.generateContent(prompt).text ?: ""
+                    if (res.isNotBlank()) {
+                        onResponse(res.trim())
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            onResponse("") // Trigger fallback
         }
     }
 
