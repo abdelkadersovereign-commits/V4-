@@ -35,6 +35,9 @@ import com.example.ui.theme.AmberZen
 import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.VoidBlack
 import com.example.ui.viewmodel.DashboardViewModel
+import androidx.browser.customtabs.CustomTabsIntent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
 
 data class SecureResource(
     val titleAr: String,
@@ -51,10 +54,18 @@ fun ResourcesScreen(
     viewModel: DashboardViewModel,
     onClose: () -> Unit
 ) {
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    val uriHandler = LocalUriHandler.current
     val isAr by viewModel.isArabic.collectAsState()
     val layoutDirection = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
+
+    fun openIntelligenceLink(url: String) {
+        val builder = CustomTabsIntent.Builder()
+        builder.setToolbarColor(android.graphics.Color.parseColor("#0D1117")) // VoidBlack
+        builder.setShowTitle(true)
+        val customTabsIntent = builder.build()
+        customTabsIntent.launchUrl(context, Uri.parse(url))
+    }
 
     val resources = listOf(
         SecureResource(
@@ -105,6 +116,7 @@ fun ResourcesScreen(
                     )
                 )
                 .statusBarsPadding()
+                .navigationBarsPadding()
         ) {
             Column(
                 modifier = Modifier
@@ -207,11 +219,7 @@ fun ResourcesScreen(
                                 .background(Color(0xFF070B12).copy(alpha = 0.85f), RoundedCornerShape(12.dp))
                                 .clickable {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    try {
-                                        uriHandler.openUri(resource.url)
-                                    } catch (e: Exception) {
-                                        e.printStackTrace()
-                                    }
+                                    openIntelligenceLink(resource.url)
                                 }
                                 .padding(12.dp),
                             verticalArrangement = Arrangement.SpaceBetween

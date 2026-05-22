@@ -1,6 +1,13 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -51,6 +58,40 @@ data class AcademySyllabusModule(
     val descEn: String,
     val icon: String
 )
+
+@Composable
+fun ShimmerEffect(
+    modifier: Modifier = Modifier,
+    width: Float = 0.5f
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val xShimmer by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "xShimmer"
+    )
+
+    val brush = Brush.linearGradient(
+        colors = listOf(
+            CyberCyan.copy(alpha = 0.05f),
+            CyberCyan.copy(alpha = 0.2f),
+            CyberCyan.copy(alpha = 0.05f),
+        ),
+        start = Offset(xShimmer - 300f, xShimmer - 300f),
+        end = Offset(xShimmer, xShimmer)
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(20.dp)
+            .background(brush, RoundedCornerShape(4.dp))
+    )
+}
 
 @Composable
 fun AcademyScreen(
@@ -109,6 +150,8 @@ fun AcademyScreen(
                         colors = listOf(VoidBlack, Color(0xFF04070D))
                     )
                 )
+                .statusBarsPadding()
+                .navigationBarsPadding()
                 .padding(16.dp)
         ) {
             // Header
@@ -424,7 +467,9 @@ fun NeuralModuleTestView(
         )
     }
 
-    if (isGeneratingScenarios) {
+    val isAcademyGenerating by viewModel.isAcademyGenerating.collectAsState()
+
+    if (isAcademyGenerating) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -440,15 +485,19 @@ fun NeuralModuleTestView(
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
-            LinearProgressIndicator(
-                modifier = Modifier
-                    .fillMaxWidth(0.8f)
-                    .height(6.dp)
-                    .border(0.5.dp, CyberCyan.copy(alpha = 0.3f), RoundedCornerShape(3.dp)),
-                color = CyberCyan,
-                trackColor = Color.White.copy(alpha = 0.05f)
-            )
-            Spacer(modifier = Modifier.height(12.dp))
+            
+            Column(
+                modifier = Modifier.fillMaxWidth(0.9f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ShimmerEffect(modifier = Modifier.height(60.dp))
+                ShimmerEffect(modifier = Modifier.height(100.dp))
+                ShimmerEffect(modifier = Modifier.height(40.dp))
+                ShimmerEffect(modifier = Modifier.height(40.dp))
+                ShimmerEffect(modifier = Modifier.height(40.dp))
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = if (isAr) "تحسين نماذج الهجوم والدفاع العصبية" else "OPTIMIZING NEURAL OFFENSE/DEFENSE MODELS",
                 color = Color.White.copy(alpha = 0.4f),

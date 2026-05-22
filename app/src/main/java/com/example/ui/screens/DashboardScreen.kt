@@ -93,6 +93,19 @@ import kotlin.random.Random
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.animation.core.animateValue
+import androidx.browser.customtabs.CustomTabsIntent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
+
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
+import android.content.Intent
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 
 // Space Particle representing deep parallax fields
 data class SpaceParticle(
@@ -103,7 +116,12 @@ data class SpaceParticle(
 )
 
 @Composable
-fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
+fun DashboardScreen(
+    viewModel: DashboardViewModel,
+    prayerViewModel: com.example.ui.viewmodel.PrayerViewModel,
+    onVaultLockRequest: (String, String, () -> Unit) -> Unit
+) {
+    val context = LocalContext.current
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
 
     val roll by viewModel.roll.collectAsState()
@@ -125,9 +143,33 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
     val batteryPercentage by viewModel.batteryPercentage.collectAsState()
     val chargingStatus by viewModel.chargingStatus.collectAsState()
     
-    val nextPrayerName by viewModel.nextPrayerName.collectAsState()
-    val nextPrayerCountdown by viewModel.nextPrayerCountdown.collectAsState()
-    val nextPrayerProgress by viewModel.nextPrayerProgress.collectAsState()
+    // Accurate Prayer Data from PrayerViewModel
+    val nextPrayerName by prayerViewModel.nextPrayerName.collectAsState()
+    val nextPrayerCountdown by prayerViewModel.nextPrayerCountdown.collectAsState()
+    val nextPrayerProgress by prayerViewModel.nextPrayerProgress.collectAsState()
+    val nextPrayerTime by prayerViewModel.nextPrayerTime.collectAsState()
+    val qiblaDirection by prayerViewModel.qiblaDirection.collectAsState()
+
+    val azimuth by viewModel.azimuth.collectAsState()
+
+    // Pulse animation for HUD components
+    val infiniteTransition = rememberInfiniteTransition(label = "hudPulse")
+    val hudPulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "hudPulseAlpha"
+    )
+
+    fun openIntelligenceLink(url: String) {
+        val builder = CustomTabsIntent.Builder()
+        builder.setToolbarColor(android.graphics.Color.parseColor("#0D1117")) // VoidBlack
+        val customTabsIntent = builder.build()
+        customTabsIntent.launchUrl(context, Uri.parse(url))
+    }
 
     // Gemini states
     val isThinking by viewModel.isThinking.collectAsState()
@@ -369,7 +411,18 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
                                 color = CyberCyan,
                                 onClick = {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    viewModel.setVaultViewOpen(true)
+                                    if (viewModel.isVaultAuthenticated.value) {
+                                        viewModel.setVaultViewOpen(true)
+                                    } else {
+                                        onVaultLockRequest(
+                                            if (isAr) "تأكيد الهوية السيادية" else "SOVEREIGN IDENTITY VERIFIED",
+                                            if (isAr) "مطلوب بصمة الدخول للوصول إلى الخزنة المركزية" else "Biometric uplink required for central vault access",
+                                            { 
+                                                viewModel.setVaultAuthenticated(true)
+                                                viewModel.setVaultViewOpen(true) 
+                                            }
+                                        )
+                                    }
                                 },
                                 modifier = Modifier.weight(1f)
                             )
@@ -415,7 +468,10 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
                             pitch = cardPitchShift,
                             prayerName = nextPrayerName,
                             countdownText = nextPrayerCountdown,
-                            progress = nextPrayerProgress
+                            progress = nextPrayerProgress,
+                            qiblaAngle = qiblaDirection,
+                            pulseAlpha = hudPulseAlpha,
+                            azimuth = azimuth
                         )
                     }
 
@@ -952,16 +1008,33 @@ fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
                         }
                     } else {
                         // Responsive cryptographic idea lists
-                        LazyColumn(
+                        LazyVerticalStaggeredGrid(
+                            columns = StaggeredGridCells.Fixed(2),
                             modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                            verticalItemSpacing = 14.dp,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             items(savedIdeas, key = { it.id }) { idea ->
                                 GlowingVaultCrystalCard(
                                     idea = idea,
                                     roll = roll,
                                     pitch = pitch,
-                                    onDelete = { viewModel.deleteIdea(idea.id) }
+                                    onDelete = { viewModel.deleteIdea(idea.id) },
+                                    onExport = {
+                                        val decTitle = idea.getDecryptedTitle()
+                                        val decCategory = idea.getDecryptedCategory()
+                                        val decIdea = idea.getDecryptedOriginalIdea()
+                                        val decBlueprint = idea.getDecryptedGeminiBlueprint()
+
+                                        val shareText = "A.SYRIA V4 ARCHIVE BLUEPRINT\n\nTitle: $decTitle\nCategory: $decCategory\n\nORIGINAL CONCEPT:\n$decIdea\n\nGEMINI ANALYSIS:\n$decBlueprint\n\nTimestamp: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(idea.timestamp))}"
+                                        val sendIntent: Intent = Intent().apply {
+                                            action = Intent.ACTION_SEND
+                                            putExtra(Intent.EXTRA_TEXT, shareText)
+                                            type = "text/plain"
+                                        }
+                                        val shareIntent = Intent.createChooser(sendIntent, "DRIPPING BLUEPRINT TO EXTERNAL LINK")
+                                        context.startActivity(shareIntent)
+                                    }
                                 )
                             }
                         }
@@ -1283,7 +1356,8 @@ fun GlowingVaultCrystalCard(
     idea: InventorIdea,
     roll: Float,
     pitch: Float,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onExport: () -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
@@ -1434,13 +1508,25 @@ fun GlowingVaultCrystalCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Purge and delete button
+            // Export and Purge buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "[ PURGE DATA CRYSTAL ]",
+                    text = "[ EXPORT BLUEPRINT ]",
+                    color = CyberCyan,
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clickable { onExport() }
+                        .padding(8.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "[ PURGE ]",
                     color = Color.Red.copy(alpha = 0.8f),
                     fontSize = 9.sp,
                     fontFamily = FontFamily.Monospace,
@@ -2033,116 +2119,178 @@ fun NeuralVerseModule(verse: String, easing: CubicBezierEasing, onTap: () -> Uni
 }
 
 @Composable
+fun QiblaCompass(
+    azimuth: Float,
+    qiblaAngle: Double,
+    roll: Float,
+    pitch: Float,
+    pulseAlpha: Float
+) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    
+    // Normalize difference to find alignment
+    val diff = kotlin.math.abs(azimuth - qiblaAngle.toFloat())
+    val isAligned = diff < 6 || diff > 354
+    
+    val ringColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (isAligned) AmberZen else CyberCyan,
+        animationSpec = tween(400),
+        label = "ringColor"
+    )
+
+    val shadowColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (isAligned) AmberZen.copy(alpha = 0.6f) else CyberCyan.copy(alpha = 0.6f),
+        animationSpec = tween(400),
+        label = "shadowColor"
+    )
+
+    LaunchedEffect(isAligned) {
+        if (isAligned) {
+            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .size(180.dp)
+            .graphicsLayer {
+                rotationX = -pitch * 0.6f
+                rotationY = roll * 0.6f
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = Offset(size.width / 2, size.height / 2)
+            val radius = size.minDimension / 2.2f
+            
+            // Draw the 3D-looking glowing ring
+            drawCircle(
+                color = ringColor.copy(alpha = 0.15f * pulseAlpha),
+                radius = radius,
+                style = Stroke(width = 12f)
+            )
+            drawCircle(
+                color = ringColor.copy(alpha = 0.4f * pulseAlpha),
+                radius = radius,
+                style = Stroke(
+                    width = 2f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                )
+            )
+            
+            // Rotate the entire inner compass based on device heading
+            rotate(-azimuth, pivot = center) {
+                // North Marker
+                drawLine(
+                    color = Color.White.copy(alpha = 0.8f),
+                    start = Offset(center.x, center.y - radius),
+                    end = Offset(center.x, center.y - radius + 20f),
+                    strokeWidth = 4f
+                )
+                
+                // Qibla Marker (The target)
+                rotate(qiblaAngle.toFloat(), pivot = center) {
+                    val path = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(center.x, center.y - radius - 15f)
+                        lineTo(center.x - 12f, center.y - radius + 15f)
+                        lineTo(center.x + 12f, center.y - radius + 15f)
+                        close()
+                    }
+                    drawPath(
+                        path = path,
+                        color = ringColor
+                    )
+                    
+                    // Core Directional Line
+                    drawLine(
+                        color = ringColor.copy(alpha = 0.4f),
+                        start = center,
+                        end = Offset(center.x, center.y - radius),
+                        strokeWidth = 2f,
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 15f), 0f)
+                    )
+                }
+            }
+        }
+        
+        // Center Hub
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(VoidBlack, RoundedCornerShape(100))
+                .border(1.dp, ringColor.copy(alpha = 0.5f), RoundedCornerShape(100)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (isAligned) "⚡" else "◈",
+                color = ringColor,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
 fun SpiritualRadarGauge(
     roll: Float,
     pitch: Float,
     prayerName: String,
     countdownText: String,
-    progress: Float
+    progress: Float,
+    qiblaAngle: Double,
+    pulseAlpha: Float,
+    azimuth: Float
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(130.dp)
+            .height(280.dp)
             .graphicsLayer {
-                rotationX = -pitch * 0.4f
-                rotationY = roll * 0.4f
-                translationX = roll * 0.3f
-                translationY = pitch * 0.3f
+                rotationX = -pitch * 0.45f
+                rotationY = roll * 0.45f
             },
-        contentAlignment = Alignment.BottomCenter
+        contentAlignment = Alignment.Center
     ) {
-        Canvas(
-            modifier = Modifier
-                .width(180.dp)
-                .fillMaxHeight()
-        ) {
-            val canvasWidth = size.width
-            val canvasHeight = size.height
-            val arcSize = Size(canvasWidth, canvasHeight * 2f)
+        // Advanced 3D Qibla Compass Layer
+        QiblaCompass(
+            azimuth = azimuth,
+            qiblaAngle = qiblaAngle,
+            roll = roll,
+            pitch = pitch,
+            pulseAlpha = pulseAlpha
+        )
 
-            val startAngle = 180f
-            val baseSweep = 180f
-
-            drawArc(
-                color = CyberCyan.copy(alpha = 0.15f),
-                startAngle = startAngle,
-                sweepAngle = baseSweep,
-                useCenter = false,
-                style = Stroke(width = 4f, cap = StrokeCap.Round),
-                size = arcSize,
-                topLeft = Offset(0f, -canvasHeight / 2)
-            )
-
-            drawArc(
-                color = AmberZen,
-                startAngle = startAngle,
-                sweepAngle = progress * baseSweep,
-                useCenter = false,
-                style = Stroke(width = 6f, cap = StrokeCap.Round),
-                size = arcSize,
-                topLeft = Offset(0f, -canvasHeight / 2)
-            )
-
-            val tickCount = 13
-            val radius = canvasWidth / 2f
-            val arcCenter = Offset(radius, canvasHeight / 2)
-
-            for (i in 0 until tickCount) {
-                val angleRad = Math.toRadians((startAngle + (i.toFloat() / (tickCount - 1)) * baseSweep).toDouble())
-                val innerRadius = radius - 8f
-                val outerRadius = radius + 3f
-
-                val x1 = arcCenter.x + Math.cos(angleRad).toFloat() * innerRadius
-                val y1 = arcCenter.y - canvasHeight / 2 + Math.sin(angleRad).toFloat() * innerRadius
-                val x2 = arcCenter.x + Math.cos(angleRad).toFloat() * outerRadius
-                val y2 = arcCenter.y - canvasHeight / 2 + Math.sin(angleRad).toFloat() * outerRadius
-
-                val active = (i.toFloat() / (tickCount - 1)) <= progress
-                drawLine(
-                    color = if (active) AmberZen.copy(alpha = 0.7f) else CyberCyan.copy(alpha = 0.18f),
-                    start = Offset(x1, y1),
-                    end = Offset(x2, y2),
-                    strokeWidth = 2.5f
-                )
-            }
-        }
-
+        // Prayer Info Overlay (Centralized inside/around the ring)
         Column(
-            modifier = Modifier
-                .wrapContentSize()
-                .padding(bottom = 6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.offset(y = 100.dp) // Offset to sit below the compass center
         ) {
             Text(
-                text = "$prayerName COUNTDOWN",
-                color = CyberCyan,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp,
-                textAlign = TextAlign.Center
+                text = "NEURAL $prayerName LINK",
+                color = CyberCyan.copy(alpha = pulseAlpha),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 4.sp,
+                textAlign = TextAlign.Center,
+                fontFamily = FontFamily.Monospace
             )
             
-            Spacer(modifier = Modifier.height(3.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             
             Text(
                 text = countdownText,
                 color = Color.White,
-                fontSize = 24.sp,
+                fontSize = 28.sp,
                 fontWeight = FontWeight.ExtraBold,
                 fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.sp,
-                textAlign = TextAlign.Center
-            )
-            
-            Spacer(modifier = Modifier.height(3.dp))
-            
-            Text(
-                text = "NEURAL RADAR SWEEP ACTIVE",
-                color = Color.White.copy(alpha = 0.4f),
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 1.5.sp,
+                style = TextStyle(
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = CyberCyan.copy(alpha = 0.9f * pulseAlpha),
+                        blurRadius = 20f
+                    )
+                ),
+                letterSpacing = 2.sp,
                 textAlign = TextAlign.Center
             )
         }

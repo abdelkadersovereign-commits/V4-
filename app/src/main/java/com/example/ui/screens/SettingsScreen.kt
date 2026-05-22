@@ -33,7 +33,8 @@ import com.example.ui.viewmodel.DashboardViewModel
 @Composable
 fun SettingsScreen(
     viewModel: DashboardViewModel,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onLockRequest: (String, String, () -> Unit) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     val isAr by viewModel.isArabic.collectAsState()

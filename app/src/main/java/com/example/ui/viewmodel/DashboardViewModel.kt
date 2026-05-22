@@ -41,6 +41,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val accelerometer: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+    private val magnetometer: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
 
     // Accelerometer / Parallax State
     private val _roll = MutableStateFlow(0f)
@@ -49,15 +50,24 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _pitch = MutableStateFlow(0f)
     val pitch: StateFlow<Float> = _pitch.asStateFlow()
 
+    private val _azimuth = MutableStateFlow(0f)
+    val azimuth: StateFlow<Float> = _azimuth.asStateFlow()
+
     private val alpha = 0.12f
     private var currentRoll = 0f
     private var currentPitch = 0f
+    
+    private var gravity: FloatArray? = null
+    private var geomagnetic: FloatArray? = null
 
     private val _isAcademyGenerating = MutableStateFlow(false)
     val isAcademyGenerating: StateFlow<Boolean> = _isAcademyGenerating.asStateFlow()
 
     fun startSensors() {
         accelerometer?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+        }
+        magnetometer?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
         }
     }
@@ -79,16 +89,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _chargingStatus = MutableStateFlow("UNKNOWN")
     val chargingStatus: StateFlow<String> = _chargingStatus.asStateFlow()
-
-    // Spiritual Prayer Countdown Tracker
-    private val _nextPrayerName = MutableStateFlow("Fajr")
-    val nextPrayerName: StateFlow<String> = _nextPrayerName.asStateFlow()
-
-    private val _nextPrayerCountdown = MutableStateFlow("00:00:00")
-    val nextPrayerCountdown: StateFlow<String> = _nextPrayerCountdown.asStateFlow()
-
-    private val _nextPrayerProgress = MutableStateFlow(0f)
-    val nextPrayerProgress: StateFlow<Float> = _nextPrayerProgress.asStateFlow()
 
     // Gemini AI and Strategic Core State
     private val _isThinking = MutableStateFlow(false)
@@ -138,6 +138,20 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _isVaultViewOpen = MutableStateFlow(false)
     val isVaultViewOpen: StateFlow<Boolean> = _isVaultViewOpen.asStateFlow()
+
+    private val _isVaultAuthenticated = MutableStateFlow(false)
+    val isVaultAuthenticated: StateFlow<Boolean> = _isVaultAuthenticated.asStateFlow()
+
+    private val _isSettingsAuthenticated = MutableStateFlow(false)
+    val isSettingsAuthenticated: StateFlow<Boolean> = _isSettingsAuthenticated.asStateFlow()
+
+    fun setVaultAuthenticated(auth: Boolean) {
+        _isVaultAuthenticated.value = auth
+    }
+
+    fun setSettingsAuthenticated(auth: Boolean) {
+        _isSettingsAuthenticated.value = auth
+    }
 
     // Phase 7 Settings states and overlays
     private val dataStore = SovereignDataStore(application)
@@ -316,10 +330,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         // Initialize Gemini model based on config or custom overrides
         initializeGenerativeModel()
 
-        // Register Accelerometer
-        accelerometer?.let {
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
-        }
+        // Register Sensors
+        startSensors()
 
         // Register Battery Level
         val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
@@ -356,7 +368,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             var loopCount = 0
             while (true) {
                 pollNetworkIntel()
-                calculateSovereignPrayerEngine()
                 
                 // Fetch dynamic security intelligence brief every 300 seconds (5 minutes) or on startup
                 if (loopCount % 300 == 0) {
@@ -534,67 +545,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         return "127.0.0.1"
     }
 
-    private fun calculateSovereignPrayerEngine() {
-        val calendar = Calendar.getInstance()
-        val hour = calendar.get(Calendar.HOUR_OF_DAY)
-        val minute = calendar.get(Calendar.MINUTE)
-        val second = calendar.get(Calendar.SECOND)
-        val currentSeconds = hour * 3600 + minute * 60 + second
-
-        val fajrSeconds = 4 * 3600 + 30 * 60
-        val dhuhrSeconds = 12 * 3600 + 45 * 60
-        val asrSeconds = 16 * 3600 + 15 * 60
-        val maghribSeconds = 19 * 3600 + 30 * 60
-        val ishaSeconds = 21 * 3600 + 0 * 60
-
-        val nextName: String
-        val remaining: Int
-        val maxCycle: Int
-
-        when {
-            currentSeconds <= fajrSeconds -> {
-                nextName = "FAJR"
-                remaining = fajrSeconds - currentSeconds
-                maxCycle = 27000
-            }
-            currentSeconds <= dhuhrSeconds -> {
-                nextName = "DHUHR"
-                remaining = dhuhrSeconds - currentSeconds
-                maxCycle = 29700
-            }
-            currentSeconds <= asrSeconds -> {
-                nextName = "ASR"
-                remaining = asrSeconds - currentSeconds
-                maxCycle = 12600
-            }
-            currentSeconds <= maghribSeconds -> {
-                nextName = "MAGHRIB"
-                remaining = maghribSeconds - currentSeconds
-                maxCycle = 11700
-            }
-            currentSeconds <= ishaSeconds -> {
-                nextName = "ISHA"
-                remaining = ishaSeconds - currentSeconds
-                maxCycle = 5400
-            }
-            else -> {
-                nextName = "FAJR"
-                remaining = (86400 - currentSeconds) + fajrSeconds
-                maxCycle = 27000
-            }
-        }
-
-        _nextPrayerName.value = nextName
-
-        val h = remaining / 3600
-        val m = (remaining % 3600) / 60
-        val s = remaining % 60
-        _nextPrayerCountdown.value = String.format("%02d:%02d:%02d", h, m, s)
-
-        val elapsed = maxCycle - remaining
-        _nextPrayerProgress.value = (elapsed.toFloat() / maxCycle.toFloat()).coerceIn(0f, 1f)
-    }
-
     // Task 1: Fetch short strategic intelligence brief from Gemini (or crisp offline source)
     fun fetchStrategicIntelligence() {
         viewModelScope.launch {
@@ -682,15 +632,18 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         onFailure: (Throwable) -> Unit
     ) {
         viewModelScope.launch {
+            _isAcademyGenerating.value = true
             val model = generativeModel
             if (model != null) {
                 try {
                     val promptLocale = if (useArabic) "Arabic (العربية)" else "English"
                     val prompt = """
-                        Generate 3 unique, highly realistic cybersecurity threat scenarios based on real-world breaches for the specific syllabus module: '$moduleNameEn' / '$moduleNameAr'.
-                        Focus on major real-world attacks/vulnerabilities related to this topic.
+                        Act as the A.SYRIA Professional Cyber-Security Professor.
+                        Generate 3 unique, random, and highly challenging cybersecurity scenarios from a database of real-world attack patterns (OWASP Top 10, social engineering, zero-day exploits, nation-state actor vectors, IoT vulnerabilities, and blockchain security).
+                        Never repeat the same scenario twice in a session.
+                        Focus on the specific syllabus module: '$moduleNameEn' / '$moduleNameAr'.
                         Display everything strictly in $promptLocale.
-                        Each scenario should include: A description of the threat scenario, 4 multiple-choice options, and the correct answer index (0-3).
+                        Each scenario should include: A professional description of the threat scenario, 4 multiple-choice options with technical depth, and the correct answer index (0-3).
                         Format the response strictly as a JSON object inside a 'scenarios' key. Do not output anything other than standard JSON. No markdown backticks.
                         JSON Schema:
                         {
@@ -708,13 +661,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val cleanRes = res.replace("```json", "").replace("```", "").trim()
                     if (cleanRes.isNotBlank()) {
                         onSuccess(cleanRes)
+                        _isAcademyGenerating.value = false
                         return@launch
                     }
                 } catch (e: Exception) {
+                    _isAcademyGenerating.value = false
                     onFailure(e)
                     return@launch
                 }
             }
+            _isAcademyGenerating.value = false
             onFailure(Exception("Model offline or unavailable"))
         }
     }
@@ -746,18 +702,37 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (event == null) return
-        if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
-            val ax = event.values[0]
-            val ay = event.values[1]
+        
+        when (event.sensor.type) {
+            Sensor.TYPE_ACCELEROMETER -> {
+                gravity = event.values
+                val ax = event.values[0]
+                val ay = event.values[1]
 
-            val targetRoll = -ax * 4f
-            val targetPitch = ay * 4f
+                val targetRoll = -ax * 4f
+                val targetPitch = ay * 4f
 
-            currentRoll = currentRoll + alpha * (targetRoll - currentRoll)
-            currentPitch = currentPitch + alpha * (targetPitch - currentPitch)
+                currentRoll = currentRoll + alpha * (targetRoll - currentRoll)
+                currentPitch = currentPitch + alpha * (targetPitch - currentPitch)
 
-            _roll.value = currentRoll
-            _pitch.value = currentPitch
+                _roll.value = currentRoll
+                _pitch.value = currentPitch
+            }
+            Sensor.TYPE_MAGNETIC_FIELD -> {
+                geomagnetic = event.values
+            }
+        }
+
+        if (gravity != null && geomagnetic != null) {
+            val rMatrix = FloatArray(9)
+            val iMatrix = FloatArray(9)
+            if (SensorManager.getRotationMatrix(rMatrix, iMatrix, gravity, geomagnetic)) {
+                val orientation = FloatArray(3)
+                SensorManager.getOrientation(rMatrix, orientation)
+                var az = Math.toDegrees(orientation[0].toDouble()).toFloat()
+                if (az < 0) az += 360f
+                _azimuth.value = az
+            }
         }
     }
 

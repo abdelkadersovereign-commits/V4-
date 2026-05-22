@@ -1,10 +1,18 @@
 package com.example
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.animation.*
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -46,14 +54,13 @@ import com.example.ui.theme.AmberZen
 import com.example.ui.theme.VoidBlack
 import com.example.ui.viewmodel.DashboardViewModel
 
-import android.widget.Toast
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
     enableEdgeToEdge()
+    super.onCreate(savedInstanceState)
     
     // Initialize Sovereign Pulse Protocol (WorkManager)
     val workRequest = PeriodicWorkRequestBuilder<NotificationWorker>(4, TimeUnit.HOURS)
@@ -70,11 +77,42 @@ class MainActivity : ComponentActivity() {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
           val navController = rememberNavController()
           val vm: DashboardViewModel = viewModel()
+          val prayerVm: com.example.ui.viewmodel.PrayerViewModel = viewModel()
+
+          fun triggerBiometricAuth(title: String, subtitle: String, onSuccess: () -> Unit) {
+            val executor = ContextCompat.getMainExecutor(this@MainActivity)
+            val biometricPrompt = BiometricPrompt(this@MainActivity, executor,
+              object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                  super.onAuthenticationError(errorCode, errString)
+                  Toast.makeText(applicationContext, "Auth Error: $errString", Toast.LENGTH_SHORT).show()
+                }
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                  super.onAuthenticationSucceeded(result)
+                  onSuccess()
+                }
+                override fun onAuthenticationFailed() {
+                  super.onAuthenticationFailed()
+                  Toast.makeText(applicationContext, "Auth Failed", Toast.LENGTH_SHORT).show()
+                }
+              })
+
+            val promptInfo = BiometricPrompt.PromptInfo.Builder()
+              .setTitle(title)
+              .setSubtitle(subtitle)
+              .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG or androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+              .build()
+
+            biometricPrompt.authenticate(promptInfo)
+          }
           
           DisposableEffect(Unit) {
             val observer = LifecycleEventObserver { _, event ->
               when (event) {
-                Lifecycle.Event.ON_RESUME -> vm.startSensors()
+                Lifecycle.Event.ON_RESUME -> {
+                  vm.startSensors()
+                  prayerVm.updateLocation()
+                }
                 Lifecycle.Event.ON_PAUSE -> vm.stopSensors()
                 else -> {}
               }
@@ -131,14 +169,27 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                   modifier = Modifier.fillMaxSize(),
                   containerColor = VoidBlack,
+                  contentWindowInsets = WindowInsets(0, 0, 0, 0),
                   bottomBar = {
+                    val infiniteTransition = rememberInfiniteTransition(label = "bottomBarGlow")
+                    val glowAlpha by infiniteTransition.animateFloat(
+                      initialValue = 0.1f,
+                      targetValue = 0.4f,
+                      animationSpec = infiniteRepeatable(
+                        animation = tween(2000, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse
+                      ),
+                      label = "glowAlpha"
+                    )
+
                     NavigationBar(
-                      containerColor = Color(0xFF04070D),
+                      containerColor = Color(0xFF04070D).copy(alpha = 0.95f),
                       tonalElevation = 8.dp,
+                      windowInsets = WindowInsets.navigationBars,
                       modifier = Modifier
                         .border(
                           width = 0.5.dp,
-                          color = CyberCyan.copy(alpha = 0.15f),
+                          color = CyberCyan.copy(alpha = glowAlpha),
                           shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
                         )
                     ) {
@@ -252,7 +303,18 @@ class MainActivity : ComponentActivity() {
                         selected = isSettingsOpen,
                         onClick = {
                           haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                          vm.setSettingsOpen(true)
+                          if (vm.isSettingsAuthenticated.value) {
+                            vm.setSettingsOpen(true)
+                          } else {
+                            triggerBiometricAuth(
+                              title = if (isAr) "تأكيد الهوية السيادية" else "SOVEREIGN IDENTITY VERIFIED",
+                              subtitle = if (isAr) "مطلوب بصمة الدخول للوصول إلى الإعدادات النخبوية" else "Biometric uplink required for elite configuration access",
+                              onSuccess = {
+                                vm.setSettingsAuthenticated(true)
+                                vm.setSettingsOpen(true)
+                              }
+                            )
+                          }
                         },
                         icon = { Icon(Icons.Default.Settings, contentDescription = "Settings", tint = if (isSettingsOpen) CyberCyan else Color.White.copy(alpha = 0.4f)) },
                         label = {
@@ -272,9 +334,7 @@ class MainActivity : ComponentActivity() {
                   }
                 ) { innerPadding ->
                   Box(
-                    modifier = Modifier
-                      .fillMaxSize()
-                      .padding(innerPadding)
+                    modifier = Modifier.fillMaxSize()
                   ) {
                     AnimatedContent(
                       targetState = activeTab,
@@ -286,7 +346,13 @@ class MainActivity : ComponentActivity() {
                     ) { tab ->
                       when (tab) {
                         "home" -> {
-                          DashboardScreen(viewModel = vm)
+                          DashboardScreen(
+                            viewModel = vm, 
+                            prayerViewModel = prayerVm,
+                            onVaultLockRequest = { title, sub, success ->
+                              triggerBiometricAuth(title, sub, success)
+                            }
+                          )
                         }
                         "academy" -> {
                           AcademyScreen(viewModel = vm)
@@ -305,7 +371,10 @@ class MainActivity : ComponentActivity() {
                     ) {
                       SettingsScreen(
                         viewModel = vm,
-                        onClose = { vm.setSettingsOpen(false) }
+                        onClose = { vm.setSettingsOpen(false) },
+                        onLockRequest = { title, sub, success ->
+                          triggerBiometricAuth(title, sub, success)
+                        }
                       )
                     }
                   }
