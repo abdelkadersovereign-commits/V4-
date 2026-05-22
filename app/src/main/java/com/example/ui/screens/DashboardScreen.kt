@@ -1,0 +1,2062 @@
+package com.example.ui.screens
+
+import androidx.compose.foundation.BorderStroke
+import com.example.data.database.InventorIdea
+import com.example.data.ContextualVerseEngine
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.ui.theme.AmberZen
+import com.example.ui.theme.CyberCyan
+import com.example.ui.theme.GlassWhite
+import com.example.ui.theme.VoidBlack
+import com.example.ui.viewmodel.DashboardViewModel
+import kotlin.random.Random
+
+// Space Particle representing deep parallax fields
+data class SpaceParticle(
+    val x: Float,
+    val y: Float,
+    val size: Float,
+    val opacity: Float
+)
+
+@Composable
+fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+
+    val roll by viewModel.roll.collectAsState()
+    val pitch by viewModel.pitch.collectAsState()
+
+    // Phase 7 Settings & Stealth Mode state tracking
+    val isStealthMode by viewModel.isStealthMode.collectAsState()
+    val customApiKey by viewModel.customApiKey.collectAsState()
+    val isSettingsOpen by viewModel.isSettingsOpen.collectAsState()
+    val stealthAlphaMultiplier = if (isStealthMode) 0.45f else 1f
+
+    // Phase 6 Ambient Wisdom state tracking
+    val ambientInsight by viewModel.ambientInsight.collectAsState()
+    val stateType = ambientInsight.stateType
+
+    // Telemetry and analytical data
+    val connectionType by viewModel.connectionType.collectAsState()
+    val ipAddress by viewModel.ipAddress.collectAsState()
+    val batteryPercentage by viewModel.batteryPercentage.collectAsState()
+    val chargingStatus by viewModel.chargingStatus.collectAsState()
+    
+    val nextPrayerName by viewModel.nextPrayerName.collectAsState()
+    val nextPrayerCountdown by viewModel.nextPrayerCountdown.collectAsState()
+    val nextPrayerProgress by viewModel.nextPrayerProgress.collectAsState()
+
+    // Gemini states
+    val isThinking by viewModel.isThinking.collectAsState()
+    val intelligenceBrief by viewModel.intelligenceBrief.collectAsState()
+    val terminalInput by viewModel.terminalInput.collectAsState()
+    val terminalResponse by viewModel.terminalResponse.collectAsState()
+    val isTerminalExpanded by viewModel.isTerminalExpanded.collectAsState()
+
+    // Phase 5 Vault & Forge states
+    val savedIdeas by viewModel.savedIdeas.collectAsState()
+    val isForgePanelOpen by viewModel.isForgePanelOpen.collectAsState()
+    val isVaultViewOpen by viewModel.isVaultViewOpen.collectAsState()
+
+    val forgeTitle by viewModel.forgeTitle.collectAsState()
+    val forgeCategory by viewModel.forgeCategory.collectAsState()
+    val forgeIdea by viewModel.forgeIdea.collectAsState()
+    val forgeBlueprint by viewModel.forgeBlueprint.collectAsState()
+
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    // Cubic bezier easing for organic visual pulse cycle
+    val cubicBezierEasing = remember { CubicBezierEasing(0.445f, 0.05f, 0.55f, 0.95f) }
+
+    val smoothRoll by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = roll,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessVeryLow
+        ),
+        label = "smoothRoll"
+    )
+
+    val smoothPitch by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = pitch,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessVeryLow
+        ),
+        label = "smoothPitch"
+    )
+
+    // Multi-layered Parallax dimensions derived from smooth accelerometer roll and pitch
+    val bgRollShift = smoothRoll * 2.8f
+    val bgPitchShift = smoothPitch * 2.8f
+
+    val coreRollShift = smoothRoll * 1.5f
+    val corePitchShift = smoothPitch * 1.5f
+
+    val cardRollShift = smoothRoll * 0.8f
+    val cardPitchShift = smoothPitch * 0.8f
+
+    val spiritualVerses = remember {
+        listOf(
+            "أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ",
+            "إِنَّ مَعَ الْعُسْرِ يُسْرًا",
+            "وَمَنْ يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ",
+            "يَهْدِي اللَّهُ لِنُورِهِ مَنْ يَشَاءُ",
+            "وَكَانَ حقًّا عَلَيْنَا نَصْرُ الْمُؤْمِنِينَ"
+        )
+    }
+    var currentVerseIndex by remember { mutableStateOf(0) }
+
+    val bgColors = when {
+        isStealthMode -> listOf(VoidBlack, Color(0xFF030508))
+        stateType == ContextualVerseEngine.AmbientStateType.CRITICAL -> listOf(Color(0xFF1B0701), VoidBlack)
+        stateType == ContextualVerseEngine.AmbientStateType.HIGH_PERFORMANCE -> listOf(Color(0xFF001B26), VoidBlack)
+        else -> listOf(VoidBlack, Color(0xFF04060A))
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.radialGradient(
+                    colors = bgColors,
+                    radius = 2200f
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        // Deep Parallax with Stealth mode speed deceleration support
+        BackgroundParticles(
+            rollOffset = bgRollShift, 
+            pitchOffset = bgPitchShift, 
+            stateType = stateType,
+            isStealthMode = isStealthMode
+        )
+
+        // Subtle gradient vignette overlay
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.6f),
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.7f)
+                        )
+                    )
+                )
+        )
+
+        // Conditional Rendering: Main Dashboard or Strategic Terminal Mode
+        if (!isTerminalExpanded) {
+            // STANDARD MODE: Unified Operations Grid
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Top Command Header and System Context Hub
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    StatusHeaderCell(roll = cardRollShift, pitch = cardPitchShift)
+                    Spacer(modifier = Modifier.height(14.dp))
+                    
+                    SovereignContextHub(
+                        roll = cardRollShift,
+                        pitch = cardPitchShift,
+                        connectionType = connectionType,
+                        ipAddress = ipAddress,
+                        batteryPercentage = batteryPercentage,
+                        chargingStatus = chargingStatus
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Phase 6 Contextual Wisdom floating card
+                    AmbientInsightCard(
+                        insight = ambientInsight,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                }
+
+                // Core Main Space Interface
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "HOLD SHIELD CORE TO ACTIVATE STRATEGIC BRAIN",
+                        color = CyberCyan.copy(alpha = 0.4f),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+
+                    // Core responsive node that transitions visually during thinking operations
+                    Box(
+                        modifier = Modifier
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onLongPress = {
+                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                        viewModel.setTerminalExpanded(true)
+                                    }
+                                )
+                            }
+                    ) {
+                        NeuralCore(
+                            roll = coreRollShift,
+                            pitch = corePitchShift,
+                            isThinking = isThinking,
+                            easing = cubicBezierEasing,
+                            sizeDimension = 190,
+                            stateType = stateType
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Tactical Holy Verse Selection Bridge
+                    NeuralVerseModule(
+                        verse = spiritualVerses[currentVerseIndex],
+                        easing = cubicBezierEasing,
+                        onTap = {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                            currentVerseIndex = (currentVerseIndex + 1) % spiritualVerses.size
+                        }
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Phase 5 Action Matrix Integration (FORGE & VAULT controllers)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp)
+                            .graphicsLayer {
+                                rotationX = -cardPitchShift * 0.7f
+                                rotationY = cardRollShift * 0.7f
+                            },
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        TacticalGridButton(
+                            text = "[ ACTIVATE FORGE ]",
+                            color = AmberZen,
+                            onClick = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                viewModel.setForgePanelOpen(true)
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                        TacticalGridButton(
+                            text = "[ ENTER VAULT ]",
+                            color = CyberCyan,
+                            onClick = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                viewModel.setVaultViewOpen(true)
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                // Radar metrics and continuous real-time stream decoder
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    SpiritualRadarGauge(
+                        roll = cardRollShift,
+                        pitch = cardPitchShift,
+                        prayerName = nextPrayerName,
+                        countdownText = nextPrayerCountdown,
+                        progress = nextPrayerProgress
+                    )
+                    
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    IntelligenceTicker(
+                        text = intelligenceBrief,
+                        roll = cardRollShift,
+                        pitch = cardPitchShift
+                    )
+                }
+            }
+        } else {
+            // TERMINAL EXTENDED MODE: Interactive Quantum Uplink Station
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Header of expanded terminal panel
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer {
+                            rotationX = -cardPitchShift * 0.5f
+                            rotationY = cardRollShift * 0.5f
+                        },
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "TACTICAL COGNITIVE STATION",
+                        color = CyberCyan,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 4.sp,
+                        fontFamily = FontFamily.Monospace,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "SATELLITE INTEL UPLINK ONLINE",
+                        color = AmberZen,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp,
+                        modifier = Modifier.alpha(0.8f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Scaled-down thinking reactor displaying thinking state color changes
+                Box(
+                    modifier = Modifier
+                        .size(110.dp)
+                ) {
+                    NeuralCore(
+                        roll = coreRollShift * 0.7f,
+                        pitch = corePitchShift * 0.7f,
+                        isThinking = isThinking,
+                        easing = cubicBezierEasing,
+                        sizeDimension = 110,
+                        stateType = stateType
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // High fidelity Terminal View
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, CyberCyan.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(8.dp))
+                        .padding(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "DEC_STATION_FEED://",
+                            color = CyberCyan,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(
+                                    if (isThinking) AmberZen else CyberCyan,
+                                    RoundedCornerShape(50)
+                                )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = if (terminalResponse.isEmpty()) {
+                            if (isThinking) "TRANSMITTING DATA TO ORBITAL GRID..." else "TERMINAL READY. TRANSMIT QUANTUM QUERY FOR NEURAL ANALYSIS..."
+                        } else {
+                            terminalResponse
+                        },
+                        color = if (isThinking) AmberZen else CyberCyan,
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        lineHeight = 18.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 100.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Dynamic Input Panel
+                OutlinedTextField(
+                    value = terminalInput,
+                    onValueChange = { viewModel.updateTerminalInput(it) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    textStyle = TextStyle(
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontFamily = FontFamily.Monospace
+                    ),
+                    placeholder = {
+                        Text(
+                            text = "Query A.SYRIA V4 brain...",
+                            color = Color.White.copy(alpha = 0.3f),
+                            fontSize = 13.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Send
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onSend = {
+                            if (terminalInput.isNotBlank()) {
+                                viewModel.sendTerminalQuery(terminalInput)
+                                keyboardController?.hide()
+                            }
+                        }
+                    ),
+                    maxLines = 3,
+                    singleLine = false,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = CyberCyan,
+                        unfocusedBorderColor = CyberCyan.copy(alpha = 0.4f),
+                        cursorColor = CyberCyan
+                    )
+                )
+
+                // Tactical action suite
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            if (terminalInput.isNotBlank()) {
+                                viewModel.sendTerminalQuery(terminalInput)
+                                keyboardController?.hide()
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = CyberCyan,
+                            contentColor = VoidBlack
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        enabled = !isThinking && terminalInput.isNotBlank()
+                    ) {
+                        Text(
+                            text = "SEND QUERY",
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            letterSpacing = 1.sp
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            keyboardController?.hide()
+                            viewModel.setTerminalExpanded(false)
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(0.75.dp, Color.White.copy(alpha = 0.3f))
+                    ) {
+                        Text(
+                            text = "CLOSE INTERFACE",
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // PHASE 5 LAYER: INVENTOR'S FORGE PANEL
+        // ==========================================
+        AnimatedVisibility(
+            visible = isForgePanelOpen,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.88f))
+                    .padding(top = 30.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .navigationBarsPadding()
+                        .imePadding()
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(Color(0xFF04060C), VoidBlack)
+                            )
+                        )
+                        .border(
+                            width = 1.dp,
+                            brush = Brush.verticalGradient(listOf(AmberZen.copy(alpha = 0.4f), Color.Transparent)),
+                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                        )
+                        .padding(20.dp)
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Header Area
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "THE INVENTOR'S FORGE",
+                                color = AmberZen,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 3.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "COGNITIVE ARCHIVE BLUEPRINT GENERATOR",
+                                color = Color.White.copy(alpha = 0.5f),
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 1.sp
+                            )
+                        }
+
+                        Text(
+                            text = "[ X ]",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier
+                                .clickable { viewModel.setForgePanelOpen(false) }
+                                .padding(8.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Title Input Box
+                    OutlinedTextField(
+                        value = forgeTitle,
+                        onValueChange = { viewModel.updateForgeTitle(it) },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = TextStyle(color = Color.White, fontSize = 13.sp, fontFamily = FontFamily.Monospace),
+                        label = { Text("PROJECT BLUEPRINT NAME", color = AmberZen.copy(alpha = 0.7f), fontSize = 10.sp, fontFamily = FontFamily.Monospace) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AmberZen,
+                            unfocusedBorderColor = AmberZen.copy(alpha = 0.35f),
+                            cursorColor = AmberZen
+                        ),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Category Selector Box
+                    OutlinedTextField(
+                        value = forgeCategory,
+                        onValueChange = { viewModel.updateForgeCategory(it) },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = TextStyle(color = Color.White, fontSize = 13.sp, fontFamily = FontFamily.Monospace),
+                        label = { Text("INNOVATION CATEGORY", color = AmberZen.copy(alpha = 0.7f), fontSize = 10.sp, fontFamily = FontFamily.Monospace) },
+                        placeholder = { Text("e.g. SecOps, GenAI, SpiritualTech", color = Color.White.copy(alpha = 0.3f), fontSize = 11.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AmberZen,
+                            unfocusedBorderColor = AmberZen.copy(alpha = 0.35f),
+                            cursorColor = AmberZen
+                        ),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Raw Idea Details Text Area
+                    OutlinedTextField(
+                        value = forgeIdea,
+                        onValueChange = { viewModel.updateForgeIdea(it) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(110.dp),
+                        textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
+                        label = { Text("RAW INNOVATION CONCEPT", color = AmberZen.copy(alpha = 0.7f), fontSize = 10.sp, fontFamily = FontFamily.Monospace) },
+                        placeholder = { Text("Detail your futuristic blueprint concept here...", color = Color.White.copy(alpha = 0.3f), fontSize = 12.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AmberZen,
+                            unfocusedBorderColor = AmberZen.copy(alpha = 0.35f),
+                            cursorColor = AmberZen
+                        ),
+                        maxLines = 5
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Action Forge Reactor Button
+                    Button(
+                        onClick = {
+                            keyboardController?.hide()
+                            viewModel.forgeAndSaveIdea()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AmberZen,
+                            contentColor = VoidBlack
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        enabled = !isThinking && forgeTitle.isNotBlank() && forgeIdea.isNotBlank()
+                    ) {
+                        Text(
+                            text = if (isThinking) "TRANSMITTING TO SATELLITE COGNIZANCE..." else "FORGE AND SAVE BLUEPRINT",
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.sp,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    // Display Resulting Formatted AI Blueprint Output in elegant gold card
+                    if (forgeBlueprint.isNotEmpty() || isThinking) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, AmberZen.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                                .background(GlassWhite, RoundedCornerShape(12.dp))
+                                .padding(14.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "SOVEREIGN_ARCHIVE_UPLINK.dat",
+                                    color = AmberZen,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                Text(
+                                    text = "ONLINE",
+                                    color = CyberCyan,
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Text(
+                                text = forgeBlueprint.ifEmpty { "TRANSMITTING COGNITIVE PARALLELS FOR DEEP SPACE SECURE COMPILATION..." },
+                                color = Color.White,
+                                fontSize = 11.5.sp,
+                                fontFamily = FontFamily.Monospace,
+                                lineHeight = 17.sp,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // PHASE 5 LAYER: SECURE VAULT LIBRARY (SAVED)
+        // ==========================================
+        AnimatedVisibility(
+            visible = isVaultViewOpen,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.9f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        .navigationBarsPadding()
+                        .padding(18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Header Menu
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "THE SECURE VAULT",
+                                color = CyberCyan,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 3.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "ENCRYPTED DESIGN BLUEPRINTS",
+                                color = Color.White.copy(alpha = 0.5f),
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 1.sp
+                            )
+                        }
+
+                        Text(
+                            text = "[ BACK ]",
+                            color = CyberCyan,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier
+                                .clickable { viewModel.setVaultViewOpen(false) }
+                                .padding(8.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Vault statistics summary
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(0.5.dp, CyberCyan.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                            .background(GlassWhite, RoundedCornerShape(6.dp))
+                            .padding(10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "ARCHIVE SYMPLEX STATUS: NOMINAL",
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = "${savedIdeas.size} DATA CRYSTALS",
+                            color = CyberCyan,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    if (savedIdeas.isEmpty()) {
+                        // Ambient Cryptographic Empty State
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "⌧",
+                                color = CyberCyan.copy(alpha = 0.35f),
+                                fontSize = 55.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "VAULT ARCHIVE VACANT",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 2.sp
+                            )
+                            Text(
+                                text = "No verified designs in high storage buffers. Navigate back to the main console and forge deep AI structural concepts.",
+                                color = Color.White.copy(alpha = 0.4f),
+                                fontSize = 10.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp),
+                                lineHeight = 16.sp
+                            )
+                        }
+                    } else {
+                        // Responsive cryptographic idea lists
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            items(savedIdeas, key = { it.id }) { idea ->
+                                GlowingVaultCrystalCard(
+                                    idea = idea,
+                                    roll = roll,
+                                    pitch = pitch,
+                                    onDelete = { viewModel.deleteIdea(idea.id) }
+                                )
+                            }
+                        }
+                    }
+                    
+                    if (savedIdeas.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "PURGE DATA ARCHIVE",
+                            color = Color.Red.copy(alpha = 0.6f),
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clickable { viewModel.wipeVault() }
+                                .padding(10.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // PHASE 7 LAYER: SOVEREIGN SETTINGS UNIT
+        // ==========================================
+        // Floating Gear button on top right of screen
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(top = 16.dp, end = 20.dp)
+                .size(40.dp)
+                .border(
+                    width = 0.5.dp,
+                    color = CyberCyan.copy(alpha = 0.45f),
+                    shape = RoundedCornerShape(10.dp)
+                )
+                .background(
+                    color = Color.White.copy(alpha = 0.05f),
+                    shape = RoundedCornerShape(10.dp)
+                )
+                .clickable {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    viewModel.setSettingsOpen(true)
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "⚙",
+                color = CyberCyan,
+                fontSize = 18.sp,
+                style = TextStyle(
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = CyberCyan.copy(alpha = 0.8f),
+                        offset = Offset(0f, 0f),
+                        blurRadius = 10f
+                    )
+                )
+            )
+        }
+
+        // Overlay Screen when isSettingsOpen is true
+        if (isSettingsOpen) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.82f))
+                    .pointerInput(Unit) {}, // Consume taps
+                contentAlignment = Alignment.Center
+            ) {
+                var keyInput by remember { mutableStateOf(customApiKey) }
+                var showPurgeConfirmation by remember { mutableStateOf(false) }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .border(1.dp, CyberCyan.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                        .background(VoidBlack.copy(alpha = 0.92f), RoundedCornerShape(14.dp))
+                        .padding(20.dp)
+                ) {
+                    Text(
+                        text = "SOVEREIGN CONFIGURATION UNIT",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 2.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "A.SYRIA V4 ADVANCED USER CONTROLS",
+                        color = CyberCyan.copy(alpha = 0.6f),
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Gemini API Key input field
+                    OutlinedTextField(
+                        value = keyInput,
+                        onValueChange = { keyInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = TextStyle(color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace),
+                        label = { Text("GEMINI API KEY OVERRIDE", color = CyberCyan.copy(alpha = 0.7f), fontSize = 9.sp, fontFamily = FontFamily.Monospace) },
+                        placeholder = { Text("Enter custom key...", color = Color.White.copy(alpha = 0.3f), fontSize = 11.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = CyberCyan,
+                            unfocusedBorderColor = CyberCyan.copy(alpha = 0.3f),
+                            cursorColor = CyberCyan
+                        ),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Stealth Mode Switch Row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(0.5.dp, CyberCyan.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                            .background(GlassWhite, RoundedCornerShape(8.dp))
+                            .padding(12.dp)
+                            .clickable {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                viewModel.setStealthMode(!isStealthMode)
+                            },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = "STEALTH MODE",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "Dims global UI & slows celestial drift",
+                                color = Color.White.copy(alpha = 0.5f),
+                                fontSize = 8.5.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .width(40.dp)
+                                .height(22.dp)
+                                .border(1.dp, if (isStealthMode) CyberCyan else Color.White.copy(alpha = 0.3f), RoundedCornerShape(11.dp))
+                                .background(if (isStealthMode) CyberCyan.copy(alpha = 0.2f) else Color.Transparent, RoundedCornerShape(11.dp))
+                                .padding(2.dp),
+                            contentAlignment = if (isStealthMode) Alignment.CenterEnd else Alignment.CenterStart
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .background(if (isStealthMode) CyberCyan else Color.White.copy(alpha = 0.5f), RoundedCornerShape(50))
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Purge Vault button
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(0.5.dp, Color.Red.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                            .background(Color.Red.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                            .padding(12.dp)
+                            .clickable {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                showPurgeConfirmation = true
+                            },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = "PURGE VAULT ARCHIVE",
+                                color = Color.Red.copy(alpha = 0.8f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "Irreversibly wipe all forged blueprints",
+                                color = Color.White.copy(alpha = 0.4f),
+                                fontSize = 8.5.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Text(
+                            text = "[ ERASE ]",
+                            color = Color.Red.copy(alpha = 0.8f),
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Dialog Actions (Save & Close)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                viewModel.setSettingsOpen(false)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.3f)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("CLOSE", color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        }
+
+                        Button(
+                            onClick = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                viewModel.updateCustomApiKey(keyInput)
+                                viewModel.setSettingsOpen(false)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = CyberCyan.copy(alpha = 0.2f)),
+                            border = BorderStroke(0.75.dp, CyberCyan),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("SAVE CONFIG", color = CyberCyan, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                }
+
+                // Inner confirmation overlay for Purge
+                if (showPurgeConfirmation) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.85f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth(0.85f)
+                                .border(1.dp, Color.Red.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                .background(VoidBlack, RoundedCornerShape(12.dp))
+                                .padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "CONFIRM VAULT PURGE",
+                                color = Color.Red,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "This operation cannot be undone. All encrypted blueprints within the local Room persistence drive will be permanently atomized.",
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 10.sp,
+                                textAlign = TextAlign.Center,
+                                lineHeight = 16.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Button(
+                                    onClick = { 
+                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                        showPurgeConfirmation = false 
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.3f)),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("ABORT", color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                                }
+                                Button(
+                                    onClick = {
+                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                        viewModel.wipeVault()
+                                        showPurgeConfirmation = false
+                                        viewModel.setSettingsOpen(false)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.15f)),
+                                    border = BorderStroke(0.75.dp, Color.Red),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("CONFIRM", color = Color.Red, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// COMPOSE SUB-COMPONENTS & LAYOUTS
+// ==========================================
+
+// Phase 5: Glowing Data Crystal holographic card tilting and shining via Gyro metrics
+@Composable
+fun GlowingVaultCrystalCard(
+    idea: InventorIdea,
+    roll: Float,
+    pitch: Float,
+    onDelete: () -> Unit
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    val rawTitle = idea.getDecryptedTitle()
+    val rawCategory = idea.getDecryptedCategory()
+    val rawIdeaText = idea.getDecryptedOriginalIdea()
+    val rawBlueprint = idea.getDecryptedGeminiBlueprint()
+
+    // Gyroscope tilting parameters
+    val tiltRoll = roll * 0.9f
+    val tiltPitch = pitch * 1.0f
+
+    // Dynamic diagonal luminous holographic sheen vector derived from physical rotation vectors
+    val dynamicSheenBrush = Brush.linearGradient(
+        colors = listOf(
+            Color.Transparent,
+            Color.White.copy(alpha = (0.04f + (roll.coerceIn(-5f, 5f) + 5f) / 95f)),
+            Color.Transparent
+        ),
+        start = Offset(0f, 0f),
+        end = Offset(450f + roll * 25f, 450f + pitch * 25f)
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                rotationX = -tiltPitch * 0.75f
+                rotationY = tiltRoll * 0.75f
+                translationX = tiltRoll * 0.4f
+                translationY = tiltPitch * 0.4f
+            }
+            .border(
+                width = 0.75.dp,
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        CyberCyan.copy(alpha = if (isExpanded) 0.6f else 0.28f),
+                        AmberZen.copy(alpha = if (isExpanded) 0.3f else 0.12f)
+                    )
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .background(GlassWhite, RoundedCornerShape(12.dp))
+            .clickable { isExpanded = !isExpanded }
+            .background(dynamicSheenBrush, RoundedCornerShape(12.dp))
+            .padding(14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = rawTitle.uppercase(),
+                    color = Color.White,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "[$rawCategory]",
+                        color = AmberZen,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "CRYSTAL_INDEX_#${1000 + idea.id % 9000}",
+                        color = Color.White.copy(alpha = 0.4f),
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+
+            // Sync statuses icon matching guidelines
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(CyberCyan, RoundedCornerShape(50))
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "SECURED",
+                    color = CyberCyan,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+
+        // Details expanded view
+        if (isExpanded) {
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.15f), thickness = 0.5.dp)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "RAW CONCEPT:",
+                color = Color.White.copy(alpha = 0.5f),
+                fontSize = 8.5.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = rawIdeaText,
+                color = Color.White,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "GEMINI EXPERT BLUEPRINT:",
+                color = AmberZen,
+                fontSize = 8.5.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+            
+            // AI output typewriter box inside the card
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .border(0.5.dp, AmberZen.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
+                    .background(Color.Black.copy(alpha = 0.82f), RoundedCornerShape(6.dp))
+                    .padding(10.dp)
+            ) {
+                Text(
+                    text = rawBlueprint,
+                    color = AmberZen,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    lineHeight = 16.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Purge and delete button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Text(
+                    text = "[ PURGE DATA CRYSTAL ]",
+                    color = Color.Red.copy(alpha = 0.8f),
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clickable { onDelete() }
+                        .padding(8.dp)
+                )
+            }
+        }
+    }
+}
+
+// Phase 6 Contextual Wisdom Ambient Insight Typewriter Board
+@Composable
+fun AmbientInsightCard(
+    insight: ContextualVerseEngine.SpiritualInsight,
+    modifier: Modifier = Modifier
+) {
+    val fullText = remember(insight) {
+        "${insight.systemAnalysis}. REMEMBER: \"${insight.verseArabic}\" (${insight.verseReference}) - ${insight.verseTranslation}"
+    }
+
+    var typedText by remember(insight) { mutableStateOf("") }
+    
+    androidx.compose.runtime.LaunchedEffect(fullText) {
+        typedText = ""
+        for (i in 1..fullText.length) {
+            typedText = fullText.substring(0, i)
+            kotlinx.coroutines.delay(18)
+        }
+        typedText = fullText
+    }
+
+    val stateColor = when (insight.stateType) {
+        ContextualVerseEngine.AmbientStateType.CRITICAL -> AmberZen
+        ContextualVerseEngine.AmbientStateType.HIGH_PERFORMANCE -> CyberCyan
+        ContextualVerseEngine.AmbientStateType.NORMAL -> Color.White.copy(alpha = 0.8f)
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .border(
+                width = 0.5.dp,
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        stateColor.copy(alpha = 0.45f),
+                        Color.Transparent
+                    )
+                ),
+                shape = RoundedCornerShape(10.dp)
+            )
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0x0FFFFFFF),
+                        Color(0x02FFFFFF)
+                    )
+                ),
+                shape = RoundedCornerShape(10.dp)
+            )
+            .padding(14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(stateColor, RoundedCornerShape(50))
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "AMBIENT WISDOM STATION STATUS",
+                    color = stateColor,
+                    fontSize = 8.5.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 1.5.sp
+                )
+            }
+            Text(
+                text = "ONLINE",
+                color = stateColor.copy(alpha = 0.5f),
+                fontSize = 7.5.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Text(
+            text = typedText,
+            color = Color.White.copy(alpha = 0.9f),
+            fontSize = 11.sp,
+            fontFamily = FontFamily.Monospace,
+            lineHeight = 16.sp
+        )
+    }
+}
+
+// Standard cyber outline technical grid button with click ripple specs
+@Composable
+fun TacticalGridButton(
+    text: String,
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
+            .background(GlassWhite, RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 11.dp, horizontal = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = color,
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            letterSpacing = 1.sp,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+fun BackgroundParticles(
+    rollOffset: Float, 
+    pitchOffset: Float,
+    stateType: ContextualVerseEngine.AmbientStateType = ContextualVerseEngine.AmbientStateType.NORMAL,
+    isStealthMode: Boolean = false
+) {
+    val durationMs = when {
+        isStealthMode -> 32000 // Incredibly slow speed drift representing deep stealth
+        stateType == ContextualVerseEngine.AmbientStateType.CRITICAL -> 15000 // Slow speed drift
+        stateType == ContextualVerseEngine.AmbientStateType.HIGH_PERFORMANCE -> 4500 // Quick active stream
+        else -> 8000 // Normal drift
+    }
+    
+    val baseColor = when {
+        isStealthMode -> Color.Gray.copy(alpha = 0.35f)
+        stateType == ContextualVerseEngine.AmbientStateType.CRITICAL -> AmberZen
+        stateType == ContextualVerseEngine.AmbientStateType.HIGH_PERFORMANCE -> CyberCyan
+        else -> CyberCyan
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "particles_movement")
+    val autoOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMs, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "auto_offset"
+    )
+
+    val particles = remember {
+        List(85) {
+            SpaceParticle(
+                x = Random.nextFloat(),
+                y = Random.nextFloat(),
+                size = Random.nextFloat() * 3.5f + 1f,
+                opacity = Random.nextFloat() * 0.55f + 0.15f
+            )
+        }
+    }
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val width = size.width
+        val height = size.height
+
+        particles.forEach { p ->
+            val driftFactor = if (stateType == ContextualVerseEngine.AmbientStateType.HIGH_PERFORMANCE) {
+                // Directional "data stream" active effect downward
+                autoOffset * (p.size * 0.6f + 0.4f)
+            } else {
+                autoOffset * 0.25f
+            }
+
+            var px = (p.x * width + rollOffset * 1.5f) % width
+            var py = (p.y * height + pitchOffset * 1.5f + driftFactor) % height
+
+            if (px < 0) px += width
+            if (py < 0) py += height
+
+            drawCircle(
+                color = baseColor.copy(alpha = p.opacity),
+                radius = p.size,
+                center = Offset(px, py)
+            )
+        }
+    }
+}
+
+@Composable
+fun StatusHeaderCell(roll: Float, pitch: Float) {
+    Column(
+        modifier = Modifier
+            .graphicsLayer {
+                rotationX = -pitch * 0.4f
+                rotationY = roll * 0.4f
+                translationX = roll * 0.3f
+                translationY = pitch * 0.3f
+            }
+            .wrapContentSize(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "A.SYRIA V4",
+            color = Color.White,
+            style = TextStyle(
+                shadow = androidx.compose.ui.graphics.Shadow(
+                    color = CyberCyan.copy(alpha = 0.85f),
+                    offset = Offset(0f, 0f),
+                    blurRadius = 15f
+                )
+            ),
+            fontSize = 30.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontFamily = FontFamily.Serif,
+            letterSpacing = 6.sp
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "SYSTEM STATUS: SECURE",
+            color = CyberCyan,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 4.sp
+        )
+    }
+}
+
+@Composable
+fun SovereignContextHub(
+    roll: Float,
+    pitch: Float,
+    connectionType: String,
+    ipAddress: String,
+    batteryPercentage: Int,
+    chargingStatus: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                rotationX = -pitch * 0.5f
+                rotationY = roll * 0.5f
+                translationX = roll * 0.4f
+                translationY = pitch * 0.4f
+            },
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Card 1: Network Intelligence
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .border(0.75.dp, CyberCyan.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                .background(GlassWhite, RoundedCornerShape(10.dp))
+                .padding(12.dp)
+        ) {
+            Text(
+                text = "NETWORK INTEL",
+                color = CyberCyan,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.5.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = connectionType,
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "IP: $ipAddress",
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+
+        // Card 2: Mission-Critical Power Status
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .border(0.75.dp, AmberZen.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                .background(GlassWhite, RoundedCornerShape(10.dp))
+                .padding(12.dp)
+        ) {
+            Text(
+                text = "NEURAL REACTOR",
+                color = AmberZen,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.5.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "$batteryPercentage% CAPACITY",
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = chargingStatus,
+                color = (if (chargingStatus == "CHARGING") CyberCyan else Color.White).copy(alpha = 0.6f),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 1.sp
+            )
+        }
+    }
+}
+
+@Composable
+fun NeuralCore(
+    roll: Float,
+    pitch: Float,
+    isThinking: Boolean,
+    easing: CubicBezierEasing,
+    sizeDimension: Int,
+    stateType: ContextualVerseEngine.AmbientStateType = ContextualVerseEngine.AmbientStateType.NORMAL
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "NeuralLoop")
+
+    val outerRingDuration = when (stateType) {
+        ContextualVerseEngine.AmbientStateType.CRITICAL -> 24000
+        ContextualVerseEngine.AmbientStateType.HIGH_PERFORMANCE -> 6000
+        else -> 12000
+    }
+
+    val middleRingDuration = when (stateType) {
+        ContextualVerseEngine.AmbientStateType.CRITICAL -> 17000
+        ContextualVerseEngine.AmbientStateType.HIGH_PERFORMANCE -> 4500
+        else -> 8500
+    }
+
+    // Slow outward rot rotation
+    val outerRingRot by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(outerRingDuration, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "OuterRing"
+    )
+
+    // Reverse quick middle rot rotation
+    val middleRingRot by infiniteTransition.animateFloat(
+        initialValue = 360f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(middleRingDuration, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "MiddleRing"
+    )
+
+    // Double pulse speed when "thinking" or high performance active
+    val pulseDurationMillis = when {
+        isThinking -> 1100
+        stateType == ContextualVerseEngine.AmbientStateType.HIGH_PERFORMANCE -> 1600
+        stateType == ContextualVerseEngine.AmbientStateType.CRITICAL -> 4500
+        else -> 2600
+    }
+
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.94f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(pulseDurationMillis, easing = easing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "PulseScale"
+    )
+
+    // Core visual shifts based on state and Gemini calculations
+    val primaryCoreColor = when {
+        isThinking -> AmberZen
+        stateType == ContextualVerseEngine.AmbientStateType.CRITICAL -> AmberZen
+        stateType == ContextualVerseEngine.AmbientStateType.HIGH_PERFORMANCE -> CyberCyan
+        else -> CyberCyan
+    }
+
+    val secondaryCoreColor = when {
+        isThinking -> CyberCyan
+        stateType == ContextualVerseEngine.AmbientStateType.CRITICAL -> Color(0xFFE28413) // Deep Amber Orange
+        stateType == ContextualVerseEngine.AmbientStateType.HIGH_PERFORMANCE -> Color.White
+        else -> AmberZen
+    }
+
+    Box(
+        modifier = Modifier
+            .size(sizeDimension.dp)
+            .graphicsLayer {
+                rotationX = -pitch * 1.2f
+                rotationY = roll * 1.2f
+                translationX = roll * 1.1f
+                translationY = pitch * 1.1f
+                scaleX = pulseScale
+                scaleY = pulseScale
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val r = size.minDimension / 2f
+
+            // Outer Orbit: Alternating Dashed Cyber Ring
+            rotate(outerRingRot, pivot = center) {
+                drawCircle(
+                    color = primaryCoreColor.copy(alpha = 0.35f),
+                    radius = r * 0.86f,
+                    style = Stroke(
+                        width = 3.5f,
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 25f), 0f)
+                    )
+                )
+            }
+
+            // Middle Orbit: Golden Barrier Shield Ring
+            rotate(middleRingRot, pivot = center) {
+                drawCircle(
+                    color = secondaryCoreColor.copy(alpha = 0.55f),
+                    radius = r * 0.68f,
+                    style = Stroke(
+                        width = 4.5f,
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(65f, 25f), 0f)
+                    )
+                )
+            }
+
+            // Inner Core Structure
+            drawCircle(
+                color = primaryCoreColor.copy(alpha = 0.12f),
+                radius = r * 0.48f
+            )
+            drawCircle(
+                color = primaryCoreColor.copy(alpha = 0.8f),
+                radius = r * 0.46f,
+                style = Stroke(width = 2.5f)
+            )
+
+            // Absolute Inner Satellite Node
+            drawCircle(
+                color = secondaryCoreColor,
+                radius = r * 0.15f
+            )
+            drawCircle(
+                color = Color.White,
+                radius = r * 0.05f
+            )
+        }
+    }
+}
+
+@Composable
+fun NeuralVerseModule(verse: String, easing: CubicBezierEasing, onTap: () -> Unit) {
+    val infiniteTransition = rememberInfiniteTransition(label = "VerseGlow")
+    
+    val opacityGlow by infiniteTransition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2600, easing = easing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "OpacityGlow"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onTap)
+            .padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Beautiful quranic verse text with AmberZen drop shadow glow
+        Text(
+            text = verse,
+            color = AmberZen,
+            style = TextStyle(
+                shadow = androidx.compose.ui.graphics.Shadow(
+                    color = AmberZen.copy(alpha = 0.85f),
+                    offset = Offset(0f, 0f),
+                    blurRadius = 15f
+                )
+            ),
+            fontSize = 21.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Serif,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .graphicsLayer { alpha = opacityGlow }
+                .padding(horizontal = 8.dp)
+        )
+        
+        Spacer(modifier = Modifier.height(2.dp))
+        
+        Text(
+            text = "TAP TO ROTATE HOLY VERSE",
+            color = Color.White.copy(alpha = 0.3f),
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 2.sp,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+fun SpiritualRadarGauge(
+    roll: Float,
+    pitch: Float,
+    prayerName: String,
+    countdownText: String,
+    progress: Float
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(130.dp)
+            .graphicsLayer {
+                rotationX = -pitch * 0.4f
+                rotationY = roll * 0.4f
+                translationX = roll * 0.3f
+                translationY = pitch * 0.3f
+            },
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Canvas(
+            modifier = Modifier
+                .width(180.dp)
+                .fillMaxHeight()
+        ) {
+            val canvasWidth = size.width
+            val canvasHeight = size.height
+            val arcSize = Size(canvasWidth, canvasHeight * 2f)
+
+            val startAngle = 180f
+            val baseSweep = 180f
+
+            drawArc(
+                color = CyberCyan.copy(alpha = 0.15f),
+                startAngle = startAngle,
+                sweepAngle = baseSweep,
+                useCenter = false,
+                style = Stroke(width = 4f, cap = StrokeCap.Round),
+                size = arcSize,
+                topLeft = Offset(0f, -canvasHeight / 2)
+            )
+
+            drawArc(
+                color = AmberZen,
+                startAngle = startAngle,
+                sweepAngle = progress * baseSweep,
+                useCenter = false,
+                style = Stroke(width = 6f, cap = StrokeCap.Round),
+                size = arcSize,
+                topLeft = Offset(0f, -canvasHeight / 2)
+            )
+
+            val tickCount = 13
+            val radius = canvasWidth / 2f
+            val arcCenter = Offset(radius, canvasHeight / 2)
+
+            for (i in 0 until tickCount) {
+                val angleRad = Math.toRadians((startAngle + (i.toFloat() / (tickCount - 1)) * baseSweep).toDouble())
+                val innerRadius = radius - 8f
+                val outerRadius = radius + 3f
+
+                val x1 = arcCenter.x + Math.cos(angleRad).toFloat() * innerRadius
+                val y1 = arcCenter.y - canvasHeight / 2 + Math.sin(angleRad).toFloat() * innerRadius
+                val x2 = arcCenter.x + Math.cos(angleRad).toFloat() * outerRadius
+                val y2 = arcCenter.y - canvasHeight / 2 + Math.sin(angleRad).toFloat() * outerRadius
+
+                val active = (i.toFloat() / (tickCount - 1)) <= progress
+                drawLine(
+                    color = if (active) AmberZen.copy(alpha = 0.7f) else CyberCyan.copy(alpha = 0.18f),
+                    start = Offset(x1, y1),
+                    end = Offset(x2, y2),
+                    strokeWidth = 2.5f
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .wrapContentSize()
+                .padding(bottom = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "$prayerName COUNTDOWN",
+                color = CyberCyan,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp,
+                textAlign = TextAlign.Center
+            )
+            
+            Spacer(modifier = Modifier.height(3.dp))
+            
+            Text(
+                text = countdownText,
+                color = Color.White,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.sp,
+                textAlign = TextAlign.Center
+            )
+            
+            Spacer(modifier = Modifier.height(3.dp))
+            
+            Text(
+                text = "NEURAL RADAR SWEEP ACTIVE",
+                color = Color.White.copy(alpha = 0.4f),
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 1.5.sp,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+// Live static/de-crypted information sliding ticker bar of global satellite intercepts
+@Composable
+fun IntelligenceTicker(text: String, roll: Float, pitch: Float) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                rotationX = -pitch * 0.3f
+                rotationY = roll * 0.3f
+                translationX = roll * 0.2f
+                translationY = pitch * 0.2f
+            }
+            .border(0.5.dp, CyberCyan.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
+            .background(VoidBlack.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+            .padding(vertical = 8.dp, horizontal = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .background(CyberCyan, RoundedCornerShape(50))
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = text,
+                color = CyberCyan,
+                fontSize = 9.5.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
