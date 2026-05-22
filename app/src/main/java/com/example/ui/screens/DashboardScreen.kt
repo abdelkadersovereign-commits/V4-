@@ -1643,7 +1643,7 @@ fun SovereignContextHub(
                 translationX = roll * 0.4f
                 translationY = pitch * 0.4f
             },
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Card 1: Network Intelligence
         Column(
@@ -1651,26 +1651,26 @@ fun SovereignContextHub(
                 .weight(1f)
                 .border(0.75.dp, CyberCyan.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
                 .background(GlassWhite, RoundedCornerShape(10.dp))
-                .padding(12.dp)
+                .padding(10.dp)
         ) {
             Text(
                 text = "NETWORK INTEL",
                 color = CyberCyan,
-                fontSize = 9.sp,
+                fontSize = 8.sp,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 1.5.sp
+                letterSpacing = 1.2.sp
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = connectionType,
                 color = Color.White,
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "IP: $ipAddress",
+                text = ipAddress,
                 color = Color.White.copy(alpha = 0.6f),
-                fontSize = 9.sp,
+                fontSize = 8.5.sp,
                 fontFamily = FontFamily.Monospace
             )
         }
@@ -1681,28 +1681,57 @@ fun SovereignContextHub(
                 .weight(1f)
                 .border(0.75.dp, AmberZen.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
                 .background(GlassWhite, RoundedCornerShape(10.dp))
-                .padding(12.dp)
+                .padding(10.dp)
         ) {
             Text(
-                text = "NEURAL REACTOR",
+                text = "REACTOR core",
                 color = AmberZen,
-                fontSize = 9.sp,
+                fontSize = 8.sp,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 1.5.sp
+                letterSpacing = 1.2.sp
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "$batteryPercentage% CAPACITY",
+                text = "$batteryPercentage%",
                 color = Color.White,
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = chargingStatus,
                 color = (if (chargingStatus == "CHARGING") CyberCyan else Color.White).copy(alpha = 0.6f),
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 1.sp
+                fontSize = 8.5.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        // Card 3: Sovereign Version Status
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .border(0.75.dp, CyberCyan.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                .background(GlassWhite, RoundedCornerShape(10.dp))
+                .padding(10.dp)
+        ) {
+            Text(
+                text = "SYSTEM ENGINE",
+                color = CyberCyan,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "SOVEREIGN V4",
+                color = Color.White,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "SYS_ACTIVE",
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = 8.5.sp,
+                fontFamily = FontFamily.Monospace
             )
         }
     }

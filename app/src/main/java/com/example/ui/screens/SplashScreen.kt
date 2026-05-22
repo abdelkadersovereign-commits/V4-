@@ -21,13 +21,13 @@ import kotlinx.coroutines.delay
 @Composable
 fun SplashScreen(onNavigateToDashboard: () -> Unit) {
     val alpha = remember { Animatable(0f) }
-    var bootLogText by remember { mutableStateOf("INITIATING SOVEREIGN UPLINK...") }
+    var bootLogText by remember { mutableStateOf("INITIATING SOVEREIGN SYSTEM V4 UPLINK...") }
     val logs = listOf(
-        "INITIATING EXOSPHERE UPLINK...",
-        "DECRYPTING SACRED CONTEXT CORES...",
+        "INITIATING EXOSPHERE V4 UPLINK...",
+        "DECRYPTING SACRED V4 CONTEXT CORES...",
         "STABILIZING CORE NEURAL AXELS...",
         "POLISHING SILENT PARALLAX ENGINES...",
-        "A-SYRIA ENCRYPTED COGNITIVE BUFFER READY."
+        "A-SYRIA V4 ENCRYPTED COGNITIVE BUFFER READY."
     )
 
     LaunchedEffect(key1 = true) {

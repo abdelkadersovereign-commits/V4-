@@ -225,7 +225,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
         // Register Accelerometer
         accelerometer?.let {
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
         }
 
         // Register Battery Level
