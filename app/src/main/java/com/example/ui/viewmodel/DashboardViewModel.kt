@@ -279,7 +279,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun executeNeuralProxyRequest(prompt: String, apiKey: String): String {
-        // Phase 25 Structure: Standard Gemini 3.5 Flash Request with URL Context Tool
+        // Phase 25 Structure: Standard Gemini 3.5 Flash Request (Quota Protection: Removed Tools)
         val json = JSONObject().apply {
             put("contents", org.json.JSONArray().put(
                 JSONObject().apply {
@@ -288,10 +288,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     ))
                 }
             ))
-            // Mandatory tool for automated context analysis
-            put("tools", org.json.JSONArray().put(
-                JSONObject().put("url_context", JSONObject())
-            ))
+            // Quota Shield: url_context and tools removed to minimize token overhead and prevent 429 errors
         }
         
         val body = json.toString().toRequestBody("application/json".toMediaType())
@@ -318,6 +315,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         if (!response.isSuccessful) {
             val code = response.code
             val errBody = response.body?.string() ?: ""
+            if (code == 429) {
+                // Phase 25: Quota Buffer Message
+                throw Exception("Neural Buffer Full (Error 429) - يتم الآن إعادة شحن الطاقة العصبية.. يرجى الانتظار 30 ثانية")
+            }
             throw Exception(if (code == 403) "Regional Block - Enable Neural Proxy" else if (code == 401) "Invalid API Key or Project ID" else "Error $code: $errBody")
         }
         
@@ -795,7 +796,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Phase 12: Dynamic Syllabus Module Scenario Generation using Gemini API
+    // Phase 25: API Quota Protection & Dynamic Academy Variation
     fun generateAcademyScenarios(
         moduleNameEn: String,
         moduleNameAr: String,
@@ -809,24 +810,27 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
                 try {
                     val promptLocale = if (useArabic) "Arabic (العربية)" else "English"
+                    val seed = System.currentTimeMillis()
                     val prompt = """
-                        Act as the A.SYRIA Professional Cyber-Security Professor.
-                        Generate 3 unique, random, and highly challenging cybersecurity scenarios from a database of real-world attack patterns (OWASP Top 10, social engineering, zero-day exploits, nation-state actor vectors, IoT vulnerabilities, and blockchain security).
-                        Never repeat the same scenario twice in a session.
-                        Focus on the specific syllabus module: '$moduleNameEn' / '$moduleNameAr'.
-                        Display everything strictly in $promptLocale.
-                        Each scenario should include: A professional description of the threat scenario, 4 multiple-choice options with technical depth, and the correct answer index (0-3).
-                        Format the response strictly as a JSON object inside a 'scenarios' key. Do not output anything other than standard JSON. No markdown backticks.
-                        JSON Schema:
+                        Act as a Cyber-Security Examiner. Using the seed [$seed], generate a unique, NEVER-BEFORE-SEE security scenario in $promptLocale. 
+                        Focus on a random sub-topic each time (e.g., WiFi Hijacking, SIM Swapping, AI Deepfakes, firmware backdoors, Quishing). 
+                        Module context: '$moduleNameEn' / '$moduleNameAr'.
+                        
+                        Generate exactly 3 unique challenging scenarios. 
+                        Ensure the JSON structure is strictly: 
                         {
                           "scenarios": [
                             {
-                              "description": "Realistic scenario description...",
-                              "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-                              "correct_index": 0
+                              "id": "${java.util.UUID.randomUUID()}",
+                              "scenario": "string", 
+                              "options": ["opt1", "opt2", "opt3", "opt4"], 
+                              "correctIndex": int, 
+                              "explanation": "Tactical technical breakdown of why the correct choice is secure..."
                             }
                           ]
                         }
+                        
+                        Output strictly JSON. No markdown.
                     """.trimIndent()
                     val res = generateContentSafely(prompt)
                     // Remove markdown wrapper if any
@@ -879,36 +883,18 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             
             val isAr = _isArabic.value
 
-            // Background Scanning Optimization: perform a HEAD request
-            var linkStatus = "Unknown"
-            try {
-                withContext(Dispatchers.IO) {
-                    val headRequest = Request.Builder().url(url).head().build()
-                    val response = okHttpClient.newCall(headRequest).execute()
-                    linkStatus = if (response.isSuccessful) "Active/Reachable (HTTP ${response.code})" else "Unreachable/Blocked (HTTP ${response.code})"
-                }
-            } catch (e: Exception) {
-                linkStatus = "Failed to reach (${e.message})"
-            }
-            
+            // Phase 25: Light Heuristic Analysis (Protecting Quota)
+            // Send only the URL domain context for a 1-sentence risk assessment.
             val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
             if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
                 try {
-                    kotlinx.coroutines.withTimeout(20000) {
+                    kotlinx.coroutines.withTimeout(15000) {
                         val promptLocale = if (isAr) "Arabic (العربية)" else "English"
                         val prompt = """
-                            Act as the A.SYRIA Link Scanner engine.
-                            Analyze the security of this resource link:
+                            Execute Light Heuristic Analysis on this URL: $url
                             Title: $resourceTitle
-                            URL: $url
-                            HTTP Status Check: $linkStatus
-                            
-                            Provide a Neural Risk Analysis including: 
-                            1. Safety Score (0-100)
-                            2. Potential Threats (if any)
-                            3. Tactical Recommendation
-                            
-                            Output format strictly in $promptLocale. Limit to 80 words. Focus on technical accuracy and sovereign protection.
+                            Provide a 1-sentence security risk assessment based on the domain name and known common patterns in $promptLocale. 
+                            Format: "[RISK_SCORE/100] Assessment sentence."
                         """.trimIndent()
                         
                         val res = generateContentSafely(prompt)

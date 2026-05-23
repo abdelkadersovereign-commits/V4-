@@ -44,11 +44,14 @@ import com.example.ui.theme.VoidBlack
 import com.example.ui.viewmodel.DashboardViewModel
 import org.json.JSONObject
 import org.json.JSONArray
+import kotlinx.coroutines.delay
 
 data class AcademyScenario(
-    val description: String,
+    val id: String,
+    val scenario: String,
     val options: List<String>,
-    val correctIndex: Int
+    val correctIndex: Int,
+    val explanation: String
 )
 
 @Immutable
@@ -324,7 +327,8 @@ fun NeuralModuleTestView(
         when (module.id) {
             "social_engineering" -> listOf(
                 AcademyScenario(
-                    description = if (isAr) {
+                    id = "off_se_1",
+                    scenario = if (isAr) {
                         "تلقيت استدعاءً طارئاً يزعم أنه من فريق الدعم الفني لشركة Uber منتحلاً هوية مهندس مهاد فني، ويطلب الحصول على رمز التحقق للمصادقة الثنائية (MFA Fatigue) بزعم تجنب توقف حسابك."
                     } else {
                         "You receive successive, urgent push alerts from Uber support, followed by an SMS claiming a support specialist needs your Multi-Factor Authentication (MFA) validation code immediately to resolve a pending terminal error. What protocol should you execute?"
@@ -344,12 +348,14 @@ fun NeuralModuleTestView(
                             "D) Provide a pseudo-random OTP sequence to confuse the tracking entity."
                         )
                     },
-                    correctIndex = 2
+                    correctIndex = 2,
+                    explanation = if (isAr) "دائما ارفض مشاركة رموز التحقق وتواصل عبر القنوات الرسمية." else "Always reject verification codes and use official channels."
                 )
             )
             "mobile_security" -> listOf(
                 AcademyScenario(
-                    description = if (isAr) {
+                    id = "off_ms_1",
+                    scenario = if (isAr) {
                         "تلقيت تنبيهاً أمنياً غامضاً يحثك على تثبيت ملف تعريفي خارجي (Configuration Profile) على هاتفك مستغلاً هندسة أمنية لتثبيت برمجية تجسس نووية خبيثة تشبه Pegasus."
                     } else {
                         "An online landing page alerts you that your smartphone has critical system leaks and prompts you to download and install an enterprise 'Configuration Profile'. This closely replicates advanced zero-click Pegasus spyware vector deployments. What is your action?"
@@ -369,12 +375,14 @@ fun NeuralModuleTestView(
                             "D) Take multiple snapshots to analyze later on a public sandbox forum."
                         )
                     },
-                    correctIndex = 1
+                    correctIndex = 1,
+                    explanation = if (isAr) "ملفات التعريف قد تحتوي على برمجيات تجسس كاملة، لا تثبتها أبدا من مصادر غير موثوقة." else "Profiles can host full spyware; never install from untrusted web sources."
                 )
             )
             "network_safety" -> listOf(
                 AcademyScenario(
-                    description = if (isAr) {
+                    id = "off_ns_1",
+                    scenario = if (isAr) {
                         "أثناء اتصالك بشبكة Wi-Fi غير آمنة في مطار، تدرك وجود هجمات اعتراض نشطة (MITM) تحاول إرسال تحديثات شهادات Root خبيثة للاستماع لكامل اتصالاتك الحيوية."
                     } else {
                         "While connected to an open airport lounge Wi-Fi network, your terminal issues SSL verification warnings and attempts to inject a hostile root CA certificate, mimicking a tactical Man-in-the-Middle (MITM) attack. How do you respond?"
@@ -394,12 +402,14 @@ fun NeuralModuleTestView(
                             "D) Clear regional cookies and flush DNS tables continuously."
                         )
                     },
-                    correctIndex = 1
+                    correctIndex = 1,
+                    explanation = if (isAr) "شهادات الجذر تمنح المهاجم قدرة كاملة على فك تشفير اتصالاتك، اقطع الاتصال فوراً." else "Root CAs allow full decryption of your traffic; sever the link immediately."
                 )
             )
             else -> listOf(
                 AcademyScenario(
-                    description = if (isAr) {
+                    id = "off_pr_1",
+                    scenario = if (isAr) {
                         "أكتشفت قيام أداة ألعاب بمسح بياناتك التعريفية وسجل المواقع والصفحات السابقة عبر تقنيات سحب البيانات التعويضية وملفات التعريف بدون موافقتك الصريحة."
                     } else {
                         "A modern web tool is discovered to be programmatically scraping your historical metadata, search trends, and localized search buffers using cross-site third-party tracker APIs without consent. How do you handle this?"
@@ -419,16 +429,26 @@ fun NeuralModuleTestView(
                             "D) Suppress individual personalized ad tracking units manually each session."
                         )
                     },
-                    correctIndex = 1
+                    correctIndex = 1,
+                    explanation = if (isAr) "استخدام أدوات حماية الخصوصية بشكل استباقي أفضل من محاولة إصلاح الضرر لاحقا." else "Proactive privacy tools are superior to reactive cleanup methods."
                 )
             )
         }
     }
 
-    // Trigger dynamic scenarios loading
-    LaunchedEffect(module.id) {
+    var cooldownTimer by remember { mutableIntStateOf(0) }
+    LaunchedEffect(cooldownTimer) {
+        if (cooldownTimer > 0) {
+            delay(1000)
+            cooldownTimer -= 1
+        }
+    }
+
+    fun triggerQuestionGeneration() {
+        if (cooldownTimer > 0) return
+        cooldownTimer = 5 // Phase 25: 5s Cooldown Shield
         isGeneratingScenarios = true
-        scenariosList = emptyList()
+        scenariosList = emptyList() // Ensure old questions are cleared
         currentScenarioIndex = 0
         selectedOptionIndex = null
         debriefText = ""
@@ -445,14 +465,16 @@ fun NeuralModuleTestView(
                     val parsed = mutableListOf<AcademyScenario>()
                     for (i in 0 until array.length()) {
                         val itemObj = array.getJSONObject(i)
-                        val desc = itemObj.getString("description")
+                        val id = itemObj.optString("id", "${java.util.UUID.randomUUID()}")
+                        val scenarioText = itemObj.getString("scenario")
                         val optsArr = itemObj.getJSONArray("options")
                         val options = mutableListOf<String>()
                         for (j in 0 until optsArr.length()) {
                             options.add(optsArr.getString(j))
                         }
-                        val correct = itemObj.getInt("correct_index")
-                        parsed.add(AcademyScenario(desc, options, correct))
+                        val correct = itemObj.getInt("correctIndex")
+                        val explanation = itemObj.optString("explanation", "")
+                        parsed.add(AcademyScenario(id, scenarioText, options, correct, explanation))
                     }
                     if (parsed.isNotEmpty()) {
                         scenariosList = parsed
@@ -471,6 +493,11 @@ fun NeuralModuleTestView(
                 isGeneratingScenarios = false
             }
         )
+    }
+
+    // Trigger dynamic scenarios loading
+    LaunchedEffect(module.id) {
+        triggerQuestionGeneration()
     }
 
     val isAcademyGenerating by viewModel.isAcademyGenerating.collectAsState()
@@ -604,7 +631,7 @@ fun NeuralModuleTestView(
                     .padding(16.dp)
             ) {
                 Text(
-                    text = currentScenario.description,
+                    text = currentScenario.scenario,
                     color = Color.White,
                     fontSize = 14.sp,
                     lineHeight = 22.sp,
@@ -696,18 +723,24 @@ fun NeuralModuleTestView(
                         isGeneratingDebrief = true
                         debriefText = ""
                         viewModel.generateStrategicDebrief(
-                            scenario = currentScenario.description,
+                            scenario = currentScenario.scenario,
                             choiceText = currentScenario.options[finalChoice],
                             useArabic = isAr,
                             onResponse = { responseDebrief ->
                                 if (responseDebrief.isNotBlank()) {
                                     debriefText = responseDebrief
+                                    if (currentScenario.explanation.isNotBlank()) {
+                                        debriefText += "\n\n[ ANALYSIS ]: ${currentScenario.explanation}"
+                                    }
                                 } else {
                                     // Local specific offline feedback
                                     debriefText = if (isAr) {
-                                        if (finalChoice == currentScenario.correctIndex) "قرار ممتاز ومطابق للأمن السيبراني العالي! الوعي الصارم والتحقق يفشلان عمليات الاختراق. تم منح +25 نقطة." else "تصرف عالي الخطورة. تذكر دائماً عزل قنوات الاتصال والامتناع عن منح رموز التحقق أو الملفات المشبوهة."
+                                        if (finalChoice == currentScenario.correctIndex) "قرار ممتاز ومطابق للأمن السيبراني العالي! الوعي الصارم والتحقق يفشلان عمليات الاختراق. تم منح +10 نقاط." else "تصرف عالي الخطورة. تذكر دائماً عزل قنوات الاتصال والامتناع عن منح رموز التحقق أو الملفات المشبوهة."
                                     } else {
-                                        if (finalChoice == currentScenario.correctIndex) "Action secure. Zero-Trust validation stops real-world malicious breach vectors perfectly! +25 PTS awarded." else "Critical operational vulnerability identified. Remember to always sever unverified configurations or channels immediately."
+                                        if (finalChoice == currentScenario.correctIndex) "Action secure. Zero-Trust validation stops real-world malicious breach vectors perfectly! +10 PTS awarded." else "Critical operational vulnerability identified. Remember to always sever unverified configurations or channels immediately."
+                                    }
+                                    if (currentScenario.explanation.isNotBlank()) {
+                                        debriefText += "\n\n[ ANALYSIS ]: ${currentScenario.explanation}"
                                     }
                                 }
                                 isGeneratingDebrief = false
@@ -788,41 +821,68 @@ fun NeuralModuleTestView(
                 }
             }
 
-            // Next Question or Exit
-            if (hasAnsweredCurrent && !isGeneratingDebrief) {
-                Spacer(modifier = Modifier.height(18.dp))
-                Button(
-                    onClick = {
-                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                        if (currentScenarioIndex + 1 < scenariosList.size) {
-                            currentScenarioIndex++
-                            selectedOptionIndex = null
-                            debriefText = ""
-                            hasAnsweredCurrent = false
-                        } else {
-                            onBack()
-                        }
+        // Next Question or Exit
+        if (hasAnsweredCurrent && !isGeneratingDebrief) {
+            Spacer(modifier = Modifier.height(18.dp))
+            
+            // Phase 25: Regenerate / Refresh Question Button with Cooldown
+            Button(
+                onClick = { triggerQuestionGeneration() },
+                colors = ButtonDefaults.buttonColors(containerColor = AmberZen.copy(alpha = 0.1f)),
+                border = BorderStroke(1.dp, if (cooldownTimer == 0) AmberZen else Color.White.copy(alpha = 0.1f)),
+                shape = RoundedCornerShape(10.dp),
+                enabled = cooldownTimer == 0 && !isGeneratingScenarios,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Text(
+                    text = if (cooldownTimer > 0) {
+                        if (isAr) "إعادة شحن عصبية ($cooldownTimer)..." else "RECHARGING ($cooldownTimer)..."
+                    } else {
+                        if (isAr) "توليد سؤال جديد ⟳" else "REGENERATE QUESTION ⟳"
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                ) {
-                    Text(
-                        text = if (isAr) {
-                            if (currentScenarioIndex + 1 < scenariosList.size) "السيناريو التالي 🡠" else "عودة للمناهج"
-                        } else {
-                            if (currentScenarioIndex + 1 < scenariosList.size) "NEXT SCENARIO 🡠" else "COMPLETE MODULE"
-                        },
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
+                    color = if (cooldownTimer == 0) AmberZen else Color.Gray,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                    if (currentScenarioIndex + 1 < scenariosList.size) {
+                        currentScenarioIndex++
+                        selectedOptionIndex = null
+                        debriefText = ""
+                        hasAnsweredCurrent = false
+                    } else {
+                        onBack()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Text(
+                    text = if (isAr) {
+                        if (currentScenarioIndex + 1 < scenariosList.size) "السيناريو التالي 🡠" else "عودة للمناهج"
+                    } else {
+                        if (currentScenarioIndex + 1 < scenariosList.size) "NEXT SCENARIO 🡠" else "COMPLETE MODULE"
+                    },
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
         }
     }
 }
