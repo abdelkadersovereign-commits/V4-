@@ -423,6 +423,7 @@ fun DashboardScreen(
                         ) {
                             TacticalGridButton(
                                 text = if (isAr) "[ تشغيل المصنع ]" else "[ ACTIVATE FORGE ]",
+                                subtitle = if (isAr) "أنشئ أفكاراً وابتكارات بالذكاء الاصطناعي واحفظها" else "AI idea generator & innovation studio",
                                 color = AmberZen,
                                 onClick = {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
@@ -432,6 +433,7 @@ fun DashboardScreen(
                             )
                             TacticalGridButton(
                                 text = if (isAr) "[ دخول الخزنة ]" else "[ ENTER VAULT ]",
+                                subtitle = if (isAr) "مخزن مشفر لأفكارك ومعلوماتك السرية" else "Encrypted vault for saved ideas & notes",
                                 color = CyberCyan,
                                 onClick = {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
@@ -467,6 +469,7 @@ fun DashboardScreen(
                         ) {
                             TacticalGridButton(
                                 text = if (isAr) "[ منهج الأكاديمية ]" else "[ ACADEMY SYLLABUS ]",
+                                subtitle = if (isAr) "اختبارات أمنية تفاعلية بالذكاء الاصطناعي" else "AI-powered interactive security tests",
                                 color = CyberCyan,
                                 onClick = {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
@@ -476,6 +479,7 @@ fun DashboardScreen(
                             )
                             TacticalGridButton(
                                 text = if (isAr) "[ مصادر الذكاء ]" else "[ INTEL DIRECTORY ]",
+                                subtitle = if (isAr) "مقالات وأدوات أمن المعلومات المختارة" else "Curated cybersecurity tools & resources",
                                 color = AmberZen,
                                 onClick = {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
@@ -1675,25 +1679,49 @@ fun TacticalGridButton(
     text: String,
     color: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    subtitle: String = ""
 ) {
+    val infiniteTransition = rememberInfiniteTransition(label = "btnGlow")
+    val borderAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f, targetValue = 0.7f,
+        animationSpec = infiniteRepeatable(tween(1800, easing = LinearEasing), RepeatMode.Reverse),
+        label = "borderAlpha"
+    )
     Box(
         modifier = modifier
-            .border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
-            .background(GlassWhite, RoundedCornerShape(8.dp))
+            .border(1.dp, color.copy(alpha = borderAlpha), RoundedCornerShape(10.dp))
+            .background(
+                Brush.verticalGradient(listOf(color.copy(alpha = 0.08f), Color(0xFF010508))),
+                RoundedCornerShape(10.dp)
+            )
             .clickable(onClick = onClick)
-            .padding(vertical = 11.dp, horizontal = 12.dp),
+            .padding(vertical = 12.dp, horizontal = 12.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = text,
-            color = color,
-            fontSize = 10.5.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            letterSpacing = 1.sp,
-            textAlign = TextAlign.Center
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = text,
+                color = color,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.sp,
+                textAlign = TextAlign.Center
+            )
+            if (subtitle.isNotBlank()) {
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = subtitle,
+                    color = color.copy(alpha = 0.5f),
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 0.5.sp,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 11.sp
+                )
+            }
+        }
     }
 }
 

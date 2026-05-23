@@ -7,33 +7,40 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.batoulapps.adhan.CalculationMethod
+import com.batoulapps.adhan.Coordinates
+import com.batoulapps.adhan.Madhab
+import com.batoulapps.adhan.Prayer
+import com.batoulapps.adhan.PrayerTimes
+import com.batoulapps.adhan.data.DateComponents
 import com.example.data.SovereignDataStore
 import com.google.ai.client.generativeai.GenerativeModel
 import kotlinx.coroutines.flow.first
 import java.util.Calendar
+import java.util.Date
 
 class NotificationWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         val dataStore = SovereignDataStore(applicationContext)
         val isAr = dataStore.isArabic.first()
-        val apiKey = dataStore.geminiApiKey.first().ifBlank { 
-            com.asyria.v4.BuildConfig.GEMINI_API_KEY 
+        val apiKey = dataStore.geminiApiKey.first().ifBlank {
+            com.asyria.v4.BuildConfig.GEMINI_API_KEY
         }
 
-        // 1. Prayer Alert Check (Simplified)
-        checkAndNotifyPrayer(isAr)
+        // 1. Precise Prayer Alert using Adhan library with saved coordinates
+        checkAndNotifyPrayerPrecise(isAr)
 
-        // 2. Gemini Security Alert
+        // 2. Gemini Security Alert (if API key available)
         if (apiKey.isNotEmpty() && apiKey != "MY_GEMINI_API_KEY") {
             try {
                 val model = GenerativeModel(modelName = "gemini-3.5-flash", apiKey = apiKey)
                 val promptLocale = if (isAr) "Arabic" else "English"
-                val prompt = "Provide a very brief (10 words max) high-priority cybersecurity alert about a modern hazard in $promptLocale. No intro."
+                val prompt = "Provide one very brief (12 words max) high-priority cybersecurity tip in $promptLocale. Be direct. No intro."
                 val res = model.generateContent(prompt).text ?: ""
                 if (res.isNotBlank()) {
                     showNotification(
-                        title = if (isAr) "تنبيه أمني سيادي" else "Sovereign Intelligence",
+                        title = if (isAr) "تنبيه أمني سيادي" else "Sovereign Intelligence Alert",
                         message = res.trim(),
                         id = 1002
                     )
@@ -46,31 +53,69 @@ class NotificationWorker(context: Context, params: WorkerParameters) : Coroutine
         return Result.success()
     }
 
-    private fun checkAndNotifyPrayer(isAr: Boolean) {
-        val calendar = Calendar.getInstance()
-        val hour = calendar.get(Calendar.HOUR_OF_DAY)
-        val minute = calendar.get(Calendar.MINUTE)
-        
-        // Simple logic: if within 5 mins of a major prayer time, notify
-        // This is a crude approximation for the task
-        val prayers = mapOf(
-            "FAJR" to (4 to 30),
-            "DHUHR" to (12 to 45),
-            "ASR" to (16 to 15),
-            "MAGHRIB" to (19 to 30),
-            "ISHA" to (21 to 0)
+    private fun checkAndNotifyPrayerPrecise(isAr: Boolean) {
+        // Read saved location from SharedPreferences (saved by PrayerViewModel)
+        val prefs = applicationContext.getSharedPreferences("prayer_prefs", Context.MODE_PRIVATE)
+        val lat = prefs.getFloat("last_lat", 33.5138f).toDouble()
+        val lon = prefs.getFloat("last_lon", 36.2765f).toDouble()
+
+        val coords = Coordinates(lat, lon)
+        val date = DateComponents.from(Date())
+        val params = CalculationMethod.MUSLIM_WORLD_LEAGUE.parameters.also { it.madhab = Madhab.SHAFI }
+        val prayerTimes = PrayerTimes(coords, date, params)
+
+        val now = Calendar.getInstance()
+        val currentMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+
+        val prayers = listOf(
+            Prayer.FAJR to prayerTimes.fajr,
+            Prayer.DHUHR to prayerTimes.dhuhr,
+            Prayer.ASR to prayerTimes.asr,
+            Prayer.MAGHRIB to prayerTimes.maghrib,
+            Prayer.ISHA to prayerTimes.isha
         )
 
-        for ((name, time) in prayers) {
-            if (hour == time.first && minute >= time.second && minute <= time.second + 4) {
+        val arabicNames = mapOf(
+            Prayer.FAJR to "الفجر",
+            Prayer.DHUHR to "الظهر",
+            Prayer.ASR to "العصر",
+            Prayer.MAGHRIB to "المغرب",
+            Prayer.ISHA to "العشاء"
+        )
+
+        for ((prayer, prayerDate) in prayers) {
+            if (prayerDate == null) continue
+            val prayerCal = Calendar.getInstance().apply { time = prayerDate }
+            val prayerMinutes = prayerCal.get(Calendar.HOUR_OF_DAY) * 60 + prayerCal.get(Calendar.MINUTE)
+
+            // Notify 5 minutes before
+            val minutesBefore = prayerMinutes - currentMinutes
+            if (minutesBefore in 4..6) {
+                val name = if (isAr) (arabicNames[prayer] ?: prayer.name) else prayer.name
+                val timeStr = String.format("%02d:%02d", prayerCal.get(Calendar.HOUR_OF_DAY), prayerCal.get(Calendar.MINUTE))
                 showNotification(
-                    title = if (isAr) "نداء صلاة الأولوية" else "PRIORITY PRAYER LINK",
-                    message = if (isAr) "تحذير: حان وقت $name. ابدأ بروتوكول الصلاة فوراً." else "ALERT: Time for $name. Initiate prayer protocol immediately.",
-                    id = 1001
+                    title = if (isAr) "⏰ تنبيه الصلاة — $name" else "⏰ Prayer Alert — ${prayer.name}",
+                    message = if (isAr) "بعد 5 دقائق حان وقت $name الساعة $timeStr. استعد للصلاة."
+                              else "In 5 minutes: ${prayer.name} at $timeStr. Prepare for prayer.",
+                    id = 2000 + prayer.ordinal()
                 )
-                break
+            }
+            // Notify exactly at prayer time
+            if (minutesBefore in -1..1) {
+                val name = if (isAr) (arabicNames[prayer] ?: prayer.name) else prayer.name
+                showNotification(
+                    title = if (isAr) "🕌 حان وقت $name" else "🕌 Time for ${prayer.name}",
+                    message = if (isAr) "اللهُ أكبر — حان وقت صلاة $name. توقف عن كل شيء وصلِّ."
+                              else "Allahu Akbar — Time for ${prayer.name}. Stop everything and pray.",
+                    id = 3000 + prayer.ordinal()
+                )
             }
         }
+    }
+
+    private fun Prayer.ordinal(): Int = when (this) {
+        Prayer.FAJR -> 0; Prayer.SUNRISE -> 1; Prayer.DHUHR -> 2
+        Prayer.ASR -> 3; Prayer.MAGHRIB -> 4; Prayer.ISHA -> 5; else -> 99
     }
 
     private fun showNotification(title: String, message: String, id: Int) {
@@ -79,20 +124,23 @@ class NotificationWorker(context: Context, params: WorkerParameters) : Coroutine
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(channelId, "SOVEREIGN TACTICAL ALERTS", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Critical system and spiritual intercepts"
+                description = "Prayer times and cybersecurity alerts"
                 enableVibration(true)
-                vibrationPattern = longArrayOf(0, 500, 200, 500)
+                vibrationPattern = longArrayOf(0, 300, 100, 300, 100, 500)
+                enableLights(true)
+                lightColor = android.graphics.Color.CYAN
             }
             notificationManager.createNotificationChannel(channel)
         }
 
         val notification = NotificationCompat.Builder(applicationContext, channelId)
             .setSmallIcon(android.R.drawable.stat_sys_warning)
-            .setContentTitle("SYS_ALERT | $title")
+            .setContentTitle(title)
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
             .build()
 

@@ -315,15 +315,74 @@ fun NeuralModuleTestView(
 ) {
     val haptic = LocalHapticFeedback.current
     var isGeneratingScenarios by remember { mutableStateOf(false) }
-    var scenariosList by remember { mutableStateOf<List<AcademyScenario>>(emptyList()) }
-    var currentScenarioIndex by remember { mutableStateOf(0) }
+
+    // Restore scenarios from ViewModel if same module (survives tab navigation)
+    val savedJson = remember(module.id) { viewModel.getSavedAcademyScenariosJson() }
+    val savedIdx = remember(module.id) { viewModel.getSavedAcademyIndex() }
+    val savedIds = remember(module.id) { viewModel.getSavedAcademyUsedIds().toMutableSet() }
+    val isSameModule = remember(module.id) { viewModel.getSavedAcademyModuleId() == module.id }
+
+    fun parseJsonToScenarios(json: String): List<AcademyScenario> {
+        if (json.isBlank()) return emptyList()
+        return try {
+            val root = JSONObject(json)
+            val array = root.getJSONArray("scenarios")
+            val list = mutableListOf<AcademyScenario>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                list.add(AcademyScenario(
+                    id = obj.optString("id", java.util.UUID.randomUUID().toString()),
+                    scenario = obj.getString("scenario"),
+                    options = (0 until obj.getJSONArray("options").length()).map { obj.getJSONArray("options").getString(it) },
+                    correctIndex = obj.getInt("correctIndex"),
+                    explanation = obj.optString("explanation", "")
+                ))
+            }
+            list
+        } catch (e: Exception) { emptyList() }
+    }
+
+    fun scenariosToJson(list: List<AcademyScenario>): String {
+        val arr = org.json.JSONArray()
+        list.forEach { s ->
+            val obj = JSONObject()
+            obj.put("id", s.id)
+            obj.put("scenario", s.scenario)
+            val opts = org.json.JSONArray()
+            s.options.forEach { opts.put(it) }
+            obj.put("options", opts)
+            obj.put("correctIndex", s.correctIndex)
+            obj.put("explanation", s.explanation)
+            arr.put(obj)
+        }
+        return JSONObject().apply { put("scenarios", arr) }.toString()
+    }
+
+    var scenariosList by remember {
+        mutableStateOf(if (isSameModule && savedJson.isNotBlank()) parseJsonToScenarios(savedJson) else emptyList())
+    }
+    var currentScenarioIndex by remember { mutableStateOf(if (isSameModule) savedIdx else 0) }
     var selectedOptionIndex by remember { mutableStateOf<Int?>(null) }
     var debriefText by remember { mutableStateOf("") }
     var isGeneratingDebrief by remember { mutableStateOf(false) }
     var hasAnsweredCurrent by remember { mutableStateOf(false) }
 
     // Track used scenario IDs across all API calls to avoid repetition
-    val usedScenarioIds = remember(module.id) { mutableSetOf<String>() }
+    val usedScenarioIds = remember(module.id) {
+        if (isSameModule) savedIds else mutableSetOf()
+    }
+
+    // Save progress to ViewModel whenever it changes
+    LaunchedEffect(scenariosList, currentScenarioIndex, usedScenarioIds.size) {
+        if (scenariosList.isNotEmpty()) {
+            viewModel.saveAcademyProgress(
+                moduleId = module.id,
+                scenariosJson = scenariosToJson(scenariosList),
+                index = currentScenarioIndex,
+                usedIds = usedScenarioIds.toSet()
+            )
+        }
+    }
 
     // Multi-Language high fidelity offline scenarios per module
     val offlineScenarios = remember(module.id) {
@@ -714,9 +773,11 @@ fun NeuralModuleTestView(
         )
     }
 
-    // Trigger dynamic scenarios loading
+    // Trigger dynamic scenarios loading only if no saved state for this module
     LaunchedEffect(module.id) {
-        triggerQuestionGeneration()
+        if (!isSameModule || scenariosList.isEmpty()) {
+            triggerQuestionGeneration()
+        }
     }
 
     val isAcademyGenerating by viewModel.isAcademyGenerating.collectAsState()

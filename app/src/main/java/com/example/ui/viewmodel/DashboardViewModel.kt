@@ -235,6 +235,24 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         _isAcademyOpen.value = open
     }
 
+    // Academy progress persistence (survives tab navigation)
+    private val _savedAcademyModuleId = MutableStateFlow("")
+    private val _savedAcademyScenariosJson = MutableStateFlow("")
+    private val _savedAcademyIndex = MutableStateFlow(0)
+    private val _savedAcademyUsedIds = MutableStateFlow<Set<String>>(emptySet())
+
+    fun saveAcademyProgress(moduleId: String, scenariosJson: String, index: Int, usedIds: Set<String>) {
+        _savedAcademyModuleId.value = moduleId
+        _savedAcademyScenariosJson.value = scenariosJson
+        _savedAcademyIndex.value = index
+        _savedAcademyUsedIds.value = usedIds
+    }
+
+    fun getSavedAcademyModuleId(): String = _savedAcademyModuleId.value
+    fun getSavedAcademyScenariosJson(): String = _savedAcademyScenariosJson.value
+    fun getSavedAcademyIndex(): Int = _savedAcademyIndex.value
+    fun getSavedAcademyUsedIds(): Set<String> = _savedAcademyUsedIds.value
+
     fun setResourcesOpen(open: Boolean) {
         _isResourcesOpen.value = open
     }
@@ -644,13 +662,32 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val activeNetwork = connectivityManager.activeNetwork
         val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
 
-        if (capabilities != null) {
+        // Check for actual validated internet (works with VPN, WiFi, LTE, etc.)
+        val hasInternet = capabilities != null &&
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+
+        if (hasInternet) {
             when {
+                capabilities!!.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> {
+                    _connectionType.value = "VPN+WIFI (ENCRYPTED)"
+                }
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
+                    _connectionType.value = "VPN+CELLULAR (ENCRYPTED)"
+                }
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> {
+                    _connectionType.value = "VPN (TUNNELED)"
+                }
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> {
                     _connectionType.value = "WIFI (SECURE)"
                 }
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
                     _connectionType.value = "CELLULAR (LTE/5G)"
+                }
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> {
+                    _connectionType.value = "ETHERNET (WIRED)"
                 }
                 else -> {
                     _connectionType.value = "CONNECTED"
@@ -660,6 +697,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             viewModelScope.launch(Dispatchers.IO) {
                 _ipAddress.value = fetchPublicIp()
             }
+        } else if (capabilities != null) {
+            // Network exists but no validated internet (e.g. captive portal)
+            _connectionType.value = "NO_INTERNET (SHIELDED)"
+            _ipAddress.value = extractLocalIp()
         } else {
             _connectionType.value = "DISCONNECTED"
             _ipAddress.value = "N/A"

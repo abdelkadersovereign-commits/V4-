@@ -55,6 +55,13 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
             fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null)
                 .addOnSuccessListener { location: Location? ->
                     val coords = if (location != null) {
+                        // Save location to SharedPreferences for NotificationWorker
+                        getApplication<android.app.Application>()
+                            .getSharedPreferences("prayer_prefs", android.content.Context.MODE_PRIVATE)
+                            .edit()
+                            .putFloat("last_lat", location.latitude.toFloat())
+                            .putFloat("last_lon", location.longitude.toFloat())
+                            .apply()
                         Coordinates(location.latitude, location.longitude)
                     } else {
                         Coordinates(33.5138, 36.2765) // Damascus fallback

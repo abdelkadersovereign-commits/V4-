@@ -375,7 +375,9 @@ class MainActivity : FragmentActivity() {
                   }
                 ) { innerPadding ->
                   Box(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                      .fillMaxSize()
+                      .padding(bottom = innerPadding.calculateBottomPadding())
                   ) {
                     AnimatedContent(
                       targetState = activeTab,
