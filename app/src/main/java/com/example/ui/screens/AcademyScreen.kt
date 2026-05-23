@@ -350,6 +350,56 @@ fun NeuralModuleTestView(
                     },
                     correctIndex = 2,
                     explanation = if (isAr) "دائما ارفض مشاركة رموز التحقق وتواصل عبر القنوات الرسمية." else "Always reject verification codes and use official channels."
+                ),
+                AcademyScenario(
+                    id = "off_se_2",
+                    scenario = if (isAr) {
+                        "تلقيت بريداً إلكترونياً من عنوان يبدو رسمياً يدّعي أنه من مصرفك، يطلب منك النقر على رابط وإدخال بياناتك للتحقق من حسابك خلال 24 ساعة أو سيتم تجميد الحساب. ما إجراؤك؟"
+                    } else {
+                        "You receive an email from what appears to be your bank, claiming your account will be suspended in 24 hours unless you click a link and verify your credentials immediately. This is a classic phishing vector. What is your action?"
+                    },
+                    options = if (isAr) {
+                        listOf(
+                            "أ) النقر على الرابط الفوري وإدخال بياناتك لتجنب تجميد الحساب.",
+                            "ب) تمرير الرسالة لأصدقائك لمعرفة رأيهم.",
+                            "ج) فتح متصفح جديد وكتابة عنوان بنكك مباشرة والتحقق من الحساب هناك، والإبلاغ عن البريد كتصيد.",
+                            "د) الرد على البريد بطلب تفاصيل أكثر قبل اتخاذ أي إجراء."
+                        )
+                    } else {
+                        listOf(
+                            "A) Click the link immediately to prevent account suspension.",
+                            "B) Forward it to a friend to get their opinion.",
+                            "C) Open a new browser, type your bank's URL directly, verify your account there, and report the email as phishing.",
+                            "D) Reply to the email requesting more details before taking action."
+                        )
+                    },
+                    correctIndex = 2,
+                    explanation = if (isAr) "الروابط في رسائل التصيد تقود إلى مواقع مزيفة. دائماً اكتب عنوان الموقع مباشرة." else "Phishing links lead to fake sites. Always type the URL directly and report suspicious emails."
+                ),
+                AcademyScenario(
+                    id = "off_se_3",
+                    scenario = if (isAr) {
+                        "شخص يدّعي أنه من قسم تقنية المعلومات في شركتك يطلب منك كلمة مرورك عبر الهاتف لإجراء صيانة عاجلة على الخوادم، مهدداً بأن عملك سيتأثر إن لم تتعاون فوراً."
+                    } else {
+                        "A caller claiming to be from your company's IT department requests your password over the phone, threatening urgent server maintenance will fail and you'll be blamed. This is a classic vishing (voice phishing) attack. How do you respond?"
+                    },
+                    options = if (isAr) {
+                        listOf(
+                            "أ) إعطاء كلمة المرور فوراً لتجنب المشاكل.",
+                            "ب) إعطاء كلمة مرور قديمة بدلاً من الحالية.",
+                            "ج) رفض الطلب بشكل قاطع، وإنهاء المكالمة، والإبلاغ عن الحادثة لقسم الأمن المختص.",
+                            "د) طلب المتصل إرسال طلب رسمي عبر البريد أولاً ثم مشاركة المعلومات."
+                        )
+                    } else {
+                        listOf(
+                            "A) Provide the password immediately to avoid consequences.",
+                            "B) Give an old password instead of the current one.",
+                            "C) Firmly refuse, end the call, and report the incident to your security team immediately.",
+                            "D) Ask them to send a formal email request first, then share credentials."
+                        )
+                    },
+                    correctIndex = 2,
+                    explanation = if (isAr) "لا يطلب أي قسم تقنية شرعي كلمة مرورك أبداً. ارفض دائماً وأبلغ فريق الأمن." else "No legitimate IT team ever asks for your password. Always refuse and report immediately."
                 )
             )
             "mobile_security" -> listOf(
@@ -377,6 +427,56 @@ fun NeuralModuleTestView(
                     },
                     correctIndex = 1,
                     explanation = if (isAr) "ملفات التعريف قد تحتوي على برمجيات تجسس كاملة، لا تثبتها أبدا من مصادر غير موثوقة." else "Profiles can host full spyware; never install from untrusted web sources."
+                ),
+                AcademyScenario(
+                    id = "off_ms_2",
+                    scenario = if (isAr) {
+                        "لاحظت أن تطبيقاً للألعاب قمت بتثبيته يطلب أذونات الوصول إلى جهات الاتصال والميكروفون والكاميرا والموقع. هذه الأذونات غير ضرورية للعبة. ما الذي يجب فعله؟"
+                    } else {
+                        "A newly installed gaming app requests permissions for contacts, microphone, camera, and location — all unnecessary for gaming. This is a common mobile over-permissioning attack vector. What should you do?"
+                    },
+                    options = if (isAr) {
+                        listOf(
+                            "أ) قبول جميع الأذونات لأن اللعبة لن تعمل بدونها.",
+                            "ب) قبول أذونات الميكروفون فقط وتجاهل الباقي.",
+                            "ج) رفض جميع الأذونات غير الضرورية، أو حذف التطبيق والبحث عن بديل موثوق من متجر رسمي.",
+                            "د) منح الأذونات وإيقاف تشغيل الإنترنت أثناء اللعب."
+                        )
+                    } else {
+                        listOf(
+                            "A) Accept all permissions since the game might not work otherwise.",
+                            "B) Accept only microphone access and ignore the rest.",
+                            "C) Deny all unnecessary permissions or uninstall and find a verified alternative from official stores.",
+                            "D) Grant permissions but disconnect from internet while playing."
+                        )
+                    },
+                    correctIndex = 2,
+                    explanation = if (isAr) "كل إذن غير ضروري هو ثغرة محتملة. رفض الأذونات الزائدة أو حذف التطبيق هو الخيار الأمثل." else "Every unnecessary permission is a potential vulnerability. Deny excess permissions or remove the app."
+                ),
+                AcademyScenario(
+                    id = "off_ms_3",
+                    scenario = if (isAr) {
+                        "أثناء استخدامك لمنفذ USB عام في المطار لشحن هاتفك، لاحظت ظهور نافذة منبثقة تطلب منك السماح بالوصول للبيانات. ما الإجراء الصحيح؟"
+                    } else {
+                        "While charging your phone at a public USB port in the airport (Juice Jacking risk), a popup appears asking if you trust this device and want to allow data access. What is the correct action?"
+                    },
+                    options = if (isAr) {
+                        listOf(
+                            "أ) قبول الوصول للبيانات لأن المطار مكان آمن.",
+                            "ب) رفض أي وصول للبيانات واستخدام شاحن جداري خاص أو بطارية احتياطية فقط.",
+                            "ج) قبول الوصول للبيانات وفصل الهاتف بعد الشحن مباشرة.",
+                            "د) تشغيل وضع الطيران أثناء الشحن."
+                        )
+                    } else {
+                        listOf(
+                            "A) Accept data access since it's a public airport.",
+                            "B) Reject all data access and use only a personal wall charger or power bank.",
+                            "C) Accept data access but unplug immediately after charging completes.",
+                            "D) Enable airplane mode while charging via public USB."
+                        )
+                    },
+                    correctIndex = 1,
+                    explanation = if (isAr) "منافذ USB العامة يمكن استخدامها لسرقة البيانات. رفض الوصول واستخدام شاحنك الخاص هو الحل الوحيد الآمن." else "Public USB ports can be used for data theft (Juice Jacking). Always refuse data access and use your own charger."
                 )
             )
             "network_safety" -> listOf(
@@ -404,6 +504,56 @@ fun NeuralModuleTestView(
                     },
                     correctIndex = 1,
                     explanation = if (isAr) "شهادات الجذر تمنح المهاجم قدرة كاملة على فك تشفير اتصالاتك، اقطع الاتصال فوراً." else "Root CAs allow full decryption of your traffic; sever the link immediately."
+                ),
+                AcademyScenario(
+                    id = "off_ns_2",
+                    scenario = if (isAr) {
+                        "اكتشفت أن شبكة Wi-Fi جارك تظهر كشبكة مفتوحة بدون كلمة مرور. قررت الاتصال بها لأن الاتصال الخاص لديك بطيء. هل هذا القرار صحيح؟"
+                    } else {
+                        "You discover your neighbor's Wi-Fi network appears as an open network without a password. You consider connecting because your own connection is slow. Is this the right decision?"
+                    },
+                    options = if (isAr) {
+                        listOf(
+                            "أ) نعم، الاتصال بالشبكة المجانية المفتوحة يوفر المال.",
+                            "ب) لا، الشبكات المفتوحة تعرّض بياناتك لخطر الاعتراض من صاحب الشبكة أو الآخرين على نفس الشبكة.",
+                            "ج) الاتصال مؤقتاً فقط لمهام بسيطة بدون بيانات حساسة.",
+                            "د) الاتصال لكن مع تفعيل VPN."
+                        )
+                    } else {
+                        listOf(
+                            "A) Yes, connecting to the free open network saves money.",
+                            "B) No — open networks expose your data to interception by the network owner or other users on the same network.",
+                            "C) Connect temporarily only for simple tasks without sensitive data.",
+                            "D) Connect but activate a VPN to stay safe."
+                        )
+                    },
+                    correctIndex = 1,
+                    explanation = if (isAr) "الشبكات المفتوحة تفتقر للتشفير، مما يعرّض بياناتك للاعتراض. لا تتصل بها أبداً دون VPN موثوق." else "Open networks lack encryption, exposing your traffic. Never connect without a trusted VPN — and ideally avoid them entirely."
+                ),
+                AcademyScenario(
+                    id = "off_ns_3",
+                    scenario = if (isAr) {
+                        "وصلك إشعار من جهاز التوجيه المنزلي (Router) يطلب تحديث البرنامج الثابت عبر رابط في الإشعار نفسه. هل تقوم بتثبيت التحديث؟"
+                    } else {
+                        "You receive a notification from your home router asking you to update its firmware via a link embedded in the notification itself. Should you install this update?"
+                    },
+                    options = if (isAr) {
+                        listOf(
+                            "أ) نعم، التحديثات دائماً ضرورية ويجب تثبيتها.",
+                            "ب) لا، قم بزيارة موقع الشركة المصنّعة مباشرة للتحقق من التحديث وتثبيته من المصدر الرسمي.",
+                            "ج) تثبيت التحديث وإعادة تشغيل الجهاز.",
+                            "د) تجاهل الإشعار لأن التحديثات تسبب مشاكل عادةً."
+                        )
+                    } else {
+                        listOf(
+                            "A) Yes, updates are always necessary and should be installed.",
+                            "B) No — visit the manufacturer's website directly to verify and install the update from the official source.",
+                            "C) Install the update and restart the device.",
+                            "D) Ignore the notification since updates often cause problems."
+                        )
+                    },
+                    correctIndex = 1,
+                    explanation = if (isAr) "روابط التحديث في الإشعارات قد تكون مزيفة. دائماً تحقق من التحديثات عبر الموقع الرسمي للشركة." else "Update links in notifications can be fake. Always verify updates from the manufacturer's official website."
                 )
             )
             else -> listOf(
@@ -431,6 +581,56 @@ fun NeuralModuleTestView(
                     },
                     correctIndex = 1,
                     explanation = if (isAr) "استخدام أدوات حماية الخصوصية بشكل استباقي أفضل من محاولة إصلاح الضرر لاحقا." else "Proactive privacy tools are superior to reactive cleanup methods."
+                ),
+                AcademyScenario(
+                    id = "off_pr_2",
+                    scenario = if (isAr) {
+                        "عند التسجيل في خدمة جديدة، طُلب منك الموافقة على سياسة الخصوصية. قررت الضغط على 'أوافق' مباشرة دون قراءتها. ما هو الخطر في ذلك؟"
+                    } else {
+                        "When signing up for a new service, you are asked to agree to a privacy policy. You press 'I Agree' without reading it. What is the primary risk associated with this behavior?"
+                    },
+                    options = if (isAr) {
+                        listOf(
+                            "أ) لا يوجد خطر، فهذه مجرد وثيقة قانونية روتينية.",
+                            "ب) ربما تكون وافقت على مشاركة بياناتك مع أطراف ثالثة أو استخدامها للإعلانات المستهدفة.",
+                            "ج) قد يُحظر حسابك لاحقاً بسبب انتهاك الشروط.",
+                            "د) لا يمكن للشركة مشاركة بياناتك دون إذن صريح في كل مرة."
+                        )
+                    } else {
+                        listOf(
+                            "A) No risk — it's just a routine legal document.",
+                            "B) You may have consented to sharing your data with third parties or use for targeted advertising.",
+                            "C) Your account could later be banned for violating terms.",
+                            "D) Companies cannot share your data without explicit permission each time."
+                        )
+                    },
+                    correctIndex = 1,
+                    explanation = if (isAr) "سياسات الخصوصية غالباً تتضمن بنوداً تسمح لهم بمشاركة أو بيع بياناتك. اقرأها دائماً أو استخدم مواقع تلخيصها." else "Privacy policies often include clauses allowing data sharing or sale. Always read them or use services that summarize them."
+                ),
+                AcademyScenario(
+                    id = "off_pr_3",
+                    scenario = if (isAr) {
+                        "تستخدم تطبيقاً للمحادثة يدّعي أن رسائلك مشفرة. أرسل صديقك رسالة حساسة. ما الذي يجب التحقق منه للتأكد من الأمان الفعلي؟"
+                    } else {
+                        "You use a messaging app that claims your messages are encrypted. A friend sends you sensitive information. What should you verify to ensure actual security?"
+                    },
+                    options = if (isAr) {
+                        listOf(
+                            "أ) الادعاء بالتشفير كافٍ، لا حاجة للتحقق.",
+                            "ب) التحقق من أن التشفير من طرف إلى طرف (End-to-End) مفعّل، والتطبيق مفتوح المصدر أو مدقق أمنياً بشكل مستقل.",
+                            "ج) استخدام شبكة VPN يكفي لحماية المحادثات.",
+                            "د) التحقق من عدد المستخدمين كمؤشر على الأمان."
+                        )
+                    } else {
+                        listOf(
+                            "A) Claiming encryption is sufficient — no need to verify.",
+                            "B) Verify that End-to-End Encryption (E2EE) is active, and that the app is open-source or independently audited.",
+                            "C) Using a VPN is enough to protect conversations.",
+                            "D) Check the number of users as a security indicator."
+                        )
+                    },
+                    correctIndex = 1,
+                    explanation = if (isAr) "الادعاء بالتشفير لا يكفي. التشفير من طرف إلى طرف المدقق مستقلاً هو المعيار الذهبي للخصوصية." else "Claiming encryption isn't enough. Verified, independently audited E2EE is the gold standard for private communications."
                 )
             )
         }
@@ -477,19 +677,19 @@ fun NeuralModuleTestView(
                         parsed.add(AcademyScenario(id, scenarioText, options, correct, explanation))
                     }
                     if (parsed.isNotEmpty()) {
-                        scenariosList = parsed
+                        scenariosList = parsed.shuffled()
                     } else {
-                        scenariosList = offlineScenarios
+                        scenariosList = offlineScenarios.shuffled()
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    scenariosList = offlineScenarios
+                    scenariosList = offlineScenarios.shuffled()
                 } finally {
                     isGeneratingScenarios = false
                 }
             },
             onFailure = { error ->
-                scenariosList = offlineScenarios
+                scenariosList = offlineScenarios.shuffled()
                 isGeneratingScenarios = false
                 if (error.message?.contains("503") == true || error.message?.contains("BUSY") == true) {
                     cooldownTimer = 10

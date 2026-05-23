@@ -487,16 +487,18 @@ fun DashboardScreen(
                     }
 
                     item {
-                        Spacer(modifier = Modifier.height(100.dp))
-                    }
-
-                    item {
                         IntelligenceTicker(
                             text = intelligenceBrief,
                             isOffline = isNeuralLinkOffline,
                             roll = cardRollShift,
                             pitch = cardPitchShift
                         )
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        RadiantDigitalClock(prayerName = nextPrayerName, isAr = isAr)
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
             } else {
@@ -640,16 +642,6 @@ fun DashboardScreen(
             }
         }
 
-        if (!isTerminalExpanded) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(bottom = 120.dp)
-            ) {
-                RadiantDigitalClock(prayerName = nextPrayerName, isAr = isAr)
-            }
-        }
 
         // ==========================================
         // PHASE 19: NEURAL LINK ANALYSIS OVERLAY

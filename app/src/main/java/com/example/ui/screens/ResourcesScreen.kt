@@ -62,7 +62,16 @@ fun ResourcesScreen(
 
     fun openIntelligenceLink(url: String, title: String) {
         haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-        viewModel.analyzeResourceLink(url, title)
+        try {
+            val customTabsIntent = CustomTabsIntent.Builder()
+                .setShowTitle(true)
+                .setUrlBarHidingEnabled(true)
+                .build()
+            customTabsIntent.launchUrl(context, Uri.parse(url))
+        } catch (e: Exception) {
+            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url))
+            context.startActivity(intent)
+        }
     }
 
     val resources = listOf(
