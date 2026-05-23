@@ -778,6 +778,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         moduleNameAr: String,
         useArabic: Boolean,
         usedIds: List<String> = emptyList(),
+        usedTopics: List<String> = emptyList(),
         onSuccess: (String) -> Unit,
         onFailure: (Throwable) -> Unit
     ) {
@@ -803,30 +804,41 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         "الـ Dark Web والشبكات المجهولة",
                         "هجمات التشفير والبلوكشين"
                     )
+                    // Pick a category that hasn't been picked before this session
                     val randomCategory = allCategories[Random.nextInt(allCategories.size)]
-                    val avoidClause = if (usedIds.isNotEmpty())
-                        "CRITICAL: You MUST NOT repeat any scenario with these previously-used IDs: [${usedIds.take(20).joinToString(", ")}]. Create entirely new scenarios only."
-                    else ""
+
+                    // Build a real avoid clause using actual past scenario text snippets
+                    val avoidClause = if (usedTopics.isNotEmpty()) {
+                        val topicList = usedTopics.take(15).joinToString("\n- ", prefix = "\n- ")
+                        """
+                        ⛔ STRICTLY FORBIDDEN — Do NOT create any scenario similar to or repeating these already-asked topics:
+                        $topicList
+                        
+                        Every scenario you produce MUST be on a COMPLETELY DIFFERENT situation, attack vector, and context from the above list.
+                        """.trimIndent()
+                    } else ""
 
                     val prompt = """
-                        You are a Senior Cybersecurity Trainer AI. Generate BRAND NEW scenarios never seen before.
-                        Random entropy seed (use this for uniqueness): [$seed]
-                        Topic: [$randomCategory]
+                        You are a Senior Cybersecurity Trainer AI generating FRESH, UNIQUE quiz scenarios.
+                        Entropy seed (guarantees uniqueness): [$seed]
+                        Topic focus this round: [$randomCategory]
                         Language: $promptLocale
                         Module: '$moduleNameEn' / '$moduleNameAr'
+                        
                         $avoidClause
                         
                         Rules:
-                        - Each scenario must describe a REAL-WORLD attack or threat situation
-                        - Options must be plausible and educational
-                        - Explanation must teach a security lesson
-                        - NEVER repeat previous topics
+                        - Each scenario MUST describe a DIFFERENT real-world attack, threat, or security decision
+                        - Cover varied attack vectors: phishing, MITM, malware, social engineering, password, privacy, etc.
+                        - Options must be plausible, educational, and distinct from each other
+                        - Explanation must teach a concrete security lesson
+                        - NEVER reuse the same story, platform, or attack method across scenarios
                         
                         Generate exactly 3 unique challenging scenarios in this STRICT JSON:
                         {
                           "scenarios": [
                             {
-                              "id": "unique_${seed}_1",
+                              "id": "s${seed}_1",
                               "scenario": "Detailed realistic attack scenario...",
                               "options": ["Option A", "Option B", "Option C", "Option D"],
                               "correctIndex": 0,
@@ -835,7 +847,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                           ]
                         }
                         
-                        Output ONLY valid JSON. No markdown. No explanation outside JSON.
+                        Output ONLY valid JSON. No markdown. No extra text outside JSON.
                     """.trimIndent()
                     val res = generateContentSafely(prompt)
                     // Remove markdown wrapper if any

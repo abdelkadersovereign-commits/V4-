@@ -716,11 +716,17 @@ fun NeuralModuleTestView(
         debriefText = ""
         hasAnsweredCurrent = false
 
+        // Build list of past scenario text snippets (first 80 chars) — the AI uses these to avoid repeating
+        val usedTopicSnippets = usedScenarioIds.toList().mapNotNull { id ->
+            scenariosList.find { it.id == id }?.scenario?.take(80)
+        }
+
         viewModel.generateAcademyScenarios(
             moduleNameEn = module.titleEn,
             moduleNameAr = module.titleAr,
             useArabic = isAr,
             usedIds = usedScenarioIds.toList(),
+            usedTopics = usedTopicSnippets,
             onSuccess = { jsonString ->
                 try {
                     val root = JSONObject(jsonString)
@@ -740,7 +746,7 @@ fun NeuralModuleTestView(
                         parsed.add(AcademyScenario(id, scenarioText, options, correct, explanation))
                     }
                     if (parsed.isNotEmpty()) {
-                        // Register all new IDs as used so they won't repeat
+                        // Register all new IDs and store scenario text for future avoid-list
                         parsed.forEach { usedScenarioIds.add(it.id) }
                         scenariosList = parsed.shuffled()
                     } else {
