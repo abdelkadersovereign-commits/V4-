@@ -645,7 +645,7 @@ fun DashboardScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
-                    .padding(bottom = 16.dp)
+                    .padding(bottom = 100.dp)
             ) {
                 RadiantDigitalClock(prayerName = nextPrayerName, isAr = isAr)
             }

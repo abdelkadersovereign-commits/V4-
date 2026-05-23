@@ -19,8 +19,6 @@ import com.example.data.database.InventorIdea
 import com.example.data.database.InventorIdeaRepository
 import com.example.data.database.SovereigntyCipher
 import com.example.data.ContextualVerseEngine
-import com.google.ai.client.generativeai.GenerativeModel
-import com.google.ai.client.generativeai.type.RequestOptions
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -272,28 +270,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
             if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") throw Exception("Error 401: Invalid Key")
 
-            val useProxy = _isNeuralProxy.value
-            val model = generativeModel
-
             try {
-                if (useProxy || model == null) {
-                    executeNeuralProxyRequest(prompt, apiKey)
-                } else {
-                    val res = model.generateContent(prompt).text ?: ""
-                    res
-                }
+                executeNeuralProxyRequest(prompt, apiKey)
             } catch (e: Exception) {
-                if (!useProxy && model != null) {
-                    // Implicit fallback
-                    executeNeuralProxyRequest(prompt, apiKey)
-                } else {
-                    throw e
-                }
+                throw e
             }
         }
     }
 
     private fun executeNeuralProxyRequest(prompt: String, apiKey: String): String {
+        // Phase 25 Structure: Standard Gemini 3.5 Flash Request with URL Context Tool
         val json = JSONObject().apply {
             put("contents", org.json.JSONArray().put(
                 JSONObject().apply {
@@ -302,35 +288,51 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     ))
                 }
             ))
+            // Mandatory tool for automated context analysis
+            put("tools", org.json.JSONArray().put(
+                JSONObject().put("url_context", JSONObject())
+            ))
         }
+        
         val body = json.toString().toRequestBody("application/json".toMediaType())
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey"
+        // Hardened Endpoint
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
         
-        val requestBuilder = Request.Builder().url(url).post(body)
+        val requestBuilder = Request.Builder()
+            .url(url)
+            .post(body)
+            .header("Content-Type", "application/json")
+            .header("x-goog-api-key", apiKey)
         
-        // Phase 23: Complete Project Identity Integration (The 4-Key Protocol)
-        if (_projectName.value.isNotBlank()) {
-            // Include project name context in metadata or header if necessary
-        }
+        // Phase 23: Sovereignty Identity Headers
         if (_projectId.value.isNotBlank()) {
             requestBuilder.header("x-goog-project-id", _projectId.value)
         }
         if (_projectNumber.value.isNotBlank()) {
             requestBuilder.header("x-goog-project-number", _projectNumber.value)
         }
-        val sovereignId = "${_projectId.value}:${_projectNumber.value}"
-        requestBuilder.header("x-sovereign-identity", sovereignId)
         
         val request = requestBuilder.build()
         val response = okHttpClient.newCall(request).execute()
         
         if (!response.isSuccessful) {
             val code = response.code
-            throw Exception(if (code == 403) "Error 403: Regional Block" else if (code == 401) "Error 401: Invalid Key" else "Error $code")
+            val errBody = response.body?.string() ?: ""
+            throw Exception(if (code == 403) "Regional Block - Enable Neural Proxy" else if (code == 401) "Invalid API Key or Project ID" else "Error $code: $errBody")
         }
         
         val resBody = response.body?.string() ?: ""
         val jsonRes = JSONObject(resBody)
+        
+        // Extract Usage Metadata for Terminal Display
+        val usage = jsonRes.optJSONObject("usageMetadata")
+        if (usage != null) {
+            val promptTokens = usage.optInt("promptTokenCount")
+            val candidateTokens = usage.optInt("candidatesTokenCount")
+            val totalTokens = usage.optInt("totalTokenCount")
+            _terminalResponse.value += "\n\n[ NEURAL LOAD: $totalTokens Tokens (In: $promptTokens, Out: $candidateTokens) ]"
+        }
+
         return jsonRes.getJSONArray("candidates")
             .getJSONObject(0)
             .getJSONObject("content")
@@ -407,7 +409,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val forgeBlueprint: StateFlow<String> = _forgeBlueprint.asStateFlow()
 
     private var monitoringJob: Job? = null
-    private var generativeModel: GenerativeModel? = null
 
     // Fallback security and news items if offline/no key
     private val offlineBriefs = listOf(
@@ -449,44 +450,26 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private fun initializeGenerativeModel() {
-        val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
-        val isValidKey = apiKey.isNotEmpty() && apiKey != "MY_GEMINI_API_KEY" && !apiKey.contains("PLACEHOLDER")
-        if (isValidKey) {
-            generativeModel = GenerativeModel(
-                modelName = "gemini-1.5-flash", // Upgrading to 1.5 for better intelligence
-                apiKey = apiKey
-            )
-            _isNeuralLinkOffline.value = false
-        } else {
-            generativeModel = null
-            _isNeuralLinkOffline.value = true
-        }
-    }
-
     fun testNeuralLink() {
         viewModelScope.launch {
             _isTestingKey.value = true
             val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
             if (apiKey.isEmpty() || apiKey.contains("MY_GEMINI_API_KEY") || _projectName.value.isBlank() || _projectId.value.isBlank() || _projectNumber.value.isBlank()) {
                 _isNeuralLinkOffline.value = true
-                _terminalResponse.value = "[ TERMINAL ALERT ] All Project Identity Fields (API Key, Project Name, ID, Number) are required."
+                _terminalResponse.value = "[ TERMINAL ALERT ] All Project Identity Fields (API Key, Project ID, Project Number) are required."
                 _isTestingKey.value = false
                 return@launch
             }
 
             try {
-                kotlinx.coroutines.withTimeout(10000) {
+                kotlinx.coroutines.withTimeout(15000) {
                     generateContentSafely("ping")
                 }
                 _isNeuralLinkOffline.value = false
-                _terminalResponse.value = "Neural Link Established."
+                _terminalResponse.value = "FULL NEURAL LINK ESTABLISHED ✅"
             } catch (e: Exception) {
                 _isNeuralLinkOffline.value = true
-                val err = if (e.message?.contains("403") == true) "Error 403: Regional Block"
-                        else if (e.message?.contains("401") == true) "Error 401: Invalid Key"
-                        else "Error: ${e.message}"
-                _terminalResponse.value = "[ TERMINAL ALERT ] $err"
+                _terminalResponse.value = "[ TERMINAL ALERT ] ${e.message}"
             } finally {
                 _isTestingKey.value = false
             }
@@ -494,9 +477,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     init {
-        // Initialize Gemini model based on config or custom overrides
-        initializeGenerativeModel()
-
         // Register Sensors
         startSensors()
 
@@ -517,7 +497,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             dataStore.geminiApiKey.collect { 
                 _customApiKey.value = it 
-                initializeGenerativeModel()
             }
         }
         viewModelScope.launch {
@@ -628,10 +607,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             _isThinking.value = true
             _forgeBlueprint.value = ""
 
-            val model = generativeModel
             var generatedBlueprint = ""
-
-            if (model != null) {
+            val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
+            if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
                 try {
                     val prompt = """
                         Analyze this innovation idea:
@@ -730,8 +708,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     fun fetchStrategicIntelligence() {
         viewModelScope.launch {
             val isAr = _isArabic.value
-            val model = generativeModel
-            if (model != null) {
+            val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
+            if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
                 try {
                     kotlinx.coroutines.withTimeout(15000) {
                         val promptLocale = if (isAr) "Arabic (العربية)" else "English"
@@ -780,10 +758,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             _isThinking.value = true
             _terminalResponse.value = ""
             
-            val model = generativeModel
             var rawResponse = ""
-
-            if (model != null) {
+            val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
+            
+            if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
                 try {
                     kotlinx.coroutines.withTimeout(15000) {
                         val res = generateContentSafely(
@@ -804,10 +782,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
             if (rawResponse.isEmpty() || rawResponse == offlineTerminalResponses[0]) {
                 _isNeuralLinkOffline.value = true
-                if (model != null) {
-                    // Return high fidelity contextual feedback offline
-                    rawResponse = offlineTerminalResponses[Random.nextInt(offlineTerminalResponses.size)]
-                }
+                // Return high fidelity contextual feedback offline
+                rawResponse = offlineTerminalResponses[Random.nextInt(offlineTerminalResponses.size)]
             }
 
             // Stream response using character level Typewriter Animation in coroutine
@@ -829,8 +805,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     ) {
         viewModelScope.launch {
             _isAcademyGenerating.value = true
-            val model = generativeModel
-            if (model != null) {
+            val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
+            if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
                 try {
                     val promptLocale = if (useArabic) "Arabic (العربية)" else "English"
                     val prompt = """
@@ -867,15 +843,15 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             }
             _isAcademyGenerating.value = false
-            onFailure(Exception("Model offline or unavailable"))
+            onFailure(Exception("Neural Link offline or unavailable"))
         }
     }
 
     // Phase 12: Adaptive Learning Feedback via Strategic Debrief with bilingual support
     fun generateStrategicDebrief(scenario: String, choiceText: String, useArabic: Boolean, onResponse: (String) -> Unit) {
         viewModelScope.launch {
-            val model = generativeModel
-            if (model != null) {
+            val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
+            if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
                 try {
                     val promptLocale = if (useArabic) "Arabic (العربية)" else "English"
                     val prompt = """
@@ -901,7 +877,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             _isAnalyzingLink.value = true
             _linkAnalysisResult.value = null
             
-            val model = generativeModel
             val isAr = _isArabic.value
 
             // Background Scanning Optimization: perform a HEAD request
@@ -916,11 +891,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 linkStatus = "Failed to reach (${e.message})"
             }
             
-            if (model != null || _isNeuralProxy.value) {
+            val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
+            if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
                 try {
                     kotlinx.coroutines.withTimeout(20000) {
                         val promptLocale = if (isAr) "Arabic (العربية)" else "English"
                         val prompt = """
+                            Act as the A.SYRIA Link Scanner engine.
                             Analyze the security of this resource link:
                             Title: $resourceTitle
                             URL: $url
@@ -929,9 +906,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                             Provide a Neural Risk Analysis including: 
                             1. Safety Score (0-100)
                             2. Potential Threats (if any)
-                            3. Recommendation
+                            3. Tactical Recommendation
                             
-                            Output format strictly in $promptLocale. Limit to 80 words. Focus on being tactile and sovereign.
+                            Output format strictly in $promptLocale. Limit to 80 words. Focus on technical accuracy and sovereign protection.
                         """.trimIndent()
                         
                         val res = generateContentSafely(prompt)
@@ -940,7 +917,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     _isNeuralLinkOffline.value = false
                 } catch (e: Exception) {
                     _isNeuralLinkOffline.value = true
-                    _linkAnalysisResult.value = if (isAr) "فشل الاتصال العصبي أثناء فحص الرابط." else "Neural uplink failed during link analysis."
+                    _linkAnalysisResult.value = if (isAr) "فشل الاتصال العصبي أثناء فحص الرابط: ${e.message}" else "Neural uplink failed during link analysis: ${e.message}"
                 }
             } else {
                 _isNeuralLinkOffline.value = true
