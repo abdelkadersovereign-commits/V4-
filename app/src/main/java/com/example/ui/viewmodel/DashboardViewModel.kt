@@ -709,20 +709,31 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun fetchPublicIp(): String {
         val endpoints = listOf(
-            "https://api.ipify.org",
+            "https://api64.ipify.org",
             "https://checkip.amazonaws.com",
-            "https://ifconfig.me/ip"
+            "https://ifconfig.me/ip",
+            "https://icanhazip.com"
         )
         for (endpoint in endpoints) {
             try {
-                val req = Request.Builder().url(endpoint).get()
-                    .header("User-Agent", "Dalvik/2.1.0 (Linux; Android)").build()
+                val req = Request.Builder()
+                    .url(endpoint)
+                    .get()
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+                    .header("Accept", "text/plain")
+                    .build()
+                
                 val resp = okHttpClient.newCall(req).execute()
                 if (resp.isSuccessful) {
                     val ip = resp.body?.string()?.trim() ?: continue
-                    if (ip.isNotBlank() && ip.length < 50) return ip
+                    // Basic validation to ensure it looks like an IP (v4 or v6)
+                    if (ip.isNotBlank() && ip.length < 50 && (ip.contains(".") || ip.contains(":"))) {
+                        return ip
+                    }
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
         return extractLocalIp()
     }
@@ -809,12 +820,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
                     // Build a real avoid clause using actual past scenario text snippets
                     val avoidClause = if (usedTopics.isNotEmpty()) {
-                        val topicList = usedTopics.take(15).joinToString("\n- ", prefix = "\n- ")
+                        val topicList = usedTopics.take(30).joinToString("\n- ", prefix = "\n- ")
                         """
                         ⛔ STRICTLY FORBIDDEN — Do NOT create any scenario similar to or repeating these already-asked topics:
                         $topicList
                         
-                        Every scenario you produce MUST be on a COMPLETELY DIFFERENT situation, attack vector, and context from the above list.
+                        Every scenario you produce MUST be on a COMPLETELY DIFFERENT situation, attack vector, and context from the above list. 
+                        Do not use the same characters, companies, or specific phishing lures mentioned above.
                         """.trimIndent()
                     } else ""
 
@@ -828,11 +840,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         $avoidClause
                         
                         Rules:
-                        - Each scenario MUST describe a DIFFERENT real-world attack, threat, or security decision
+                        - Each scenario MUST describe a DIFFERENT real-world attack, threat, or security decision.
                         - Cover varied attack vectors: phishing, MITM, malware, social engineering, password, privacy, etc.
-                        - Options must be plausible, educational, and distinct from each other
-                        - Explanation must teach a concrete security lesson
-                        - NEVER reuse the same story, platform, or attack method across scenarios
+                        - Options must be plausible, educational, and distinct from each other.
+                        - Explanation must teach a concrete security lesson.
+                        - NEVER reuse the same story, platform, or attack method across scenarios.
+                        - Focus on extremely specific and diverse technical details to ensure variety.
                         
                         Generate exactly 3 unique challenging scenarios in this STRICT JSON:
                         {

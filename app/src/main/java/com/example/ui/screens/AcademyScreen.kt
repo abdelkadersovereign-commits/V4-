@@ -716,9 +716,10 @@ fun NeuralModuleTestView(
         debriefText = ""
         hasAnsweredCurrent = false
 
-        // Build list of past scenario text snippets (first 80 chars) — the AI uses these to avoid repeating
+        // Build list of past scenario text snippets (first 120 chars) — the AI uses these to avoid repeating
         val usedTopicSnippets = usedScenarioIds.toList().mapNotNull { id ->
-            scenariosList.find { it.id == id }?.scenario?.take(80)
+            // Try to find the scenario in the current list, or use a persistent store if available
+            scenariosList.find { it.id == id }?.scenario?.take(120)
         }
 
         viewModel.generateAcademyScenarios(
