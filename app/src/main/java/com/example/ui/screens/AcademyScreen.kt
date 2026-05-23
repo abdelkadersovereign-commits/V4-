@@ -488,9 +488,12 @@ fun NeuralModuleTestView(
                     isGeneratingScenarios = false
                 }
             },
-            onFailure = {
+            onFailure = { error ->
                 scenariosList = offlineScenarios
                 isGeneratingScenarios = false
+                if (error.message?.contains("503") == true || error.message?.contains("BUSY") == true) {
+                    cooldownTimer = 10
+                }
             }
         )
     }

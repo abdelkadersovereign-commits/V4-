@@ -182,7 +182,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     fun setArabic(enabled: Boolean) {
         viewModelScope.launch {
             dataStore.saveIsArabic(enabled)
-            fetchStrategicIntelligence()
+            // Phase 26: fetchStrategicIntelligence() removed to protect API quota
         }
     }
 
@@ -318,6 +318,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             if (code == 429) {
                 // Phase 25: Quota Buffer Message
                 throw Exception("Neural Buffer Full (Error 429) - يتم الآن إعادة شحن الطاقة العصبية.. يرجى الانتظار 30 ثانية")
+            }
+            if (code == 503) {
+                // Phase 26: Service Stability 
+                throw Exception("UPLINK BUSY - السيرفر مشغول حالياً، يرجى المحاولة بعد قليل")
             }
             throw Exception(if (code == 403) "Regional Block - Enable Neural Proxy" else if (code == 401) "Invalid API Key or Project ID" else "Error $code: $errBody")
         }
@@ -519,25 +523,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             dataStore.neuralProxy.collect { _isNeuralProxy.value = it }
         }
         
-        startNeuralServices()
+        // Phase 26: Background Neural Services disabled to protect Quota
     }
 
-    private fun startNeuralServices() {
-        monitoringJob = viewModelScope.launch {
-            var loopCount = 0
-            while (true) {
-                pollNetworkIntel()
-                
-                // Fetch dynamic security intelligence brief every 300 seconds (5 minutes) or on startup
-                if (loopCount % 300 == 0) {
-                    fetchStrategicIntelligence()
-                }
-                
-                loopCount++
-                delay(1000)
-            }
-        }
-    }
+    // Phase 26: Removed background polling to ensure API key remains dormant
+    // private fun startNeuralServices() { ... }
 
     // Navigation and Layout Actions
     fun setTerminalExpanded(expanded: Boolean) {
@@ -608,39 +598,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             _isThinking.value = true
             _forgeBlueprint.value = ""
 
-            var generatedBlueprint = ""
-            val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
-            if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
-                try {
-                    val prompt = """
-                        Analyze this innovation idea:
-                        Title: $title
-                        Category: $category
-                        Idea Details: $ideaRaw
-                        
-                        List required technical components, and potential security risks. Format it as a professional engineering blueprint. Limit your response strictly to 180 words.
-                    """.trimIndent()
+            // Phase 26: AI Blueprinting removed to save quota
+            val generatedBlueprint = "[ ALERT ] Neural Blueprinting is offline. Local Encryption protocol used instead."
 
-                    val res = generateContentSafely(prompt)
-                    if (!res.isNullOrEmpty()) {
-                        generatedBlueprint = res.trim()
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            } else {
-                generatedBlueprint = "[ TERMINAL ALERT ] Neural Link is offline. Please configure a valid GEMINI API KEY in the System Settings to restore active intelligence."
-            }
-
-            // High aesthetic fallback system
-            if (generatedBlueprint.isEmpty()) {
-                val selectTemplate = fallbackBlueprints[Random.nextInt(fallbackBlueprints.size)]
-                generatedBlueprint = selectTemplate
-                    .replace("%TITLE%", title)
-                    .replace("%CATEGORY%", category)
-            }
-
-            // Typewriter stream effect simulation for extreme terminal feels
+            // Let character stream trigger live on screen UI updates
             _isThinking.value = false
             
             // Build and persist actual encrypted Room database entity
@@ -652,12 +613,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             )
             repository.insertIdea(encryptedEntity)
 
-            // Let character stream trigger live on screen UI updates
-            for (i in 1..generatedBlueprint.length step 3) {
-                val endIdx = (i + 2).coerceAtMost(generatedBlueprint.length)
-                _forgeBlueprint.value = generatedBlueprint.substring(0, endIdx)
-                delay(12)
-            }
             _forgeBlueprint.value = generatedBlueprint
         }
     }
@@ -705,98 +660,34 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         return "127.0.0.1"
     }
 
-    // Task 1: Fetch short strategic intelligence brief from Gemini (or crisp offline source)
+    // Phase 26: fetchStrategicIntelligence() removed to protect API quota
     fun fetchStrategicIntelligence() {
-        viewModelScope.launch {
-            val isAr = _isArabic.value
-            val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
-            if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
-                try {
-                    kotlinx.coroutines.withTimeout(15000) {
-                        val promptLocale = if (isAr) "Arabic (العربية)" else "English"
-                        val prompt = "Provide a single, very short daily security alert or threat insight about a modern device hazard (such as WhatsApp hijacking, public charging port dangers / juice jacking, fake Wi-Fi, malicious QR codes) formatted in $promptLocale. Limit output to exactly 12 words or less. Do not use quotes, markdown or introductory text."
-                        val res = generateContentSafely(prompt)
-                        val cleanRes = res.trim().replace("\n", " ")
-                        if (cleanRes.isNotEmpty()) {
-                            _intelligenceBrief.value = "[!] ALERT: $cleanRes"
-                            _isNeuralLinkOffline.value = false
-                        }
-                    }
-                    return@launch
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    _isNeuralLinkOffline.value = true
-                }
-            } else {
-                _isNeuralLinkOffline.value = true
-            }
-            // Fallback to offline decrypt brief in correct language if model generates empty or throws Exception
-            val fallbackInsight = if (isAr) {
-                val list = listOf(
-                    "تجنب منافذ الشحن العامة بالمطارات لحماية جهازك الرقمي من الاختراقات السلكية الحيوية.",
-                    "الهندسة الاجتماعية المتقدمة تستهدف مستخدمي كود واتساب للتلفيق واستلام حساباتهم.",
-                    "تجنب الاتصال بشبكات الواي فاي العامة دون تفعيل نفق اتصال مشفر مسبقاً.",
-                    "امسح فقط الأكواد التفاعلية QR المضمونة لتفادي برمجيات الفيشينغ الخبيثة التلقائية."
-                )
-                list[Random.nextInt(list.size)]
-            } else {
-                val list = listOf(
-                    "Avoid public charging ports (Juice Jacking) to secure local device data hardware.",
-                    "Advanced social engineering vectors target active WhatsApp authentication pins.",
-                    "Do not connect to secondary public Wi-Fi zones without VPN tunnels verified.",
-                    "QR code phishing (Quishing) executes automatic remote malicious software payloads."
-                )
-                list[Random.nextInt(list.size)]
-            }
-            _intelligenceBrief.value = "[!] ALERT: $fallbackInsight"
+        val list = if (_isArabic.value) {
+            listOf(
+                "تجنب منافذ الشحن العامة بالمطارات لحماية جهازك الرقمي من الاختراقات السلكية الحيوية.",
+                "الهندسة الاجتماعية المتقدمة تستهدف مستخدمي كود واتساب للتلفيق واستلام حساباتهم.",
+                "تجنب الاتصال بشبكات الواي فاي العامة دون تفعيل نفق اتصال مشفر مسبقاً.",
+                "امسح فقط الأكواد التفاعلية QR المضمونة لتفادي برمجيات الفيشينغ الخبيثة التلقائية."
+            )
+        } else {
+            listOf(
+                "Avoid public charging ports (Juice Jacking) to secure local device data hardware.",
+                "Advanced social engineering vectors target active WhatsApp authentication pins.",
+                "Do not connect to secondary public Wi-Fi zones without VPN tunnels verified.",
+                "QR code phishing (Quishing) executes automatic remote malicious software payloads."
+            )
         }
+        _intelligenceBrief.value = "[!] ALERT: ${list[Random.nextInt(list.size)]}"
     }
 
     // Task 3: Interactive query execution on Gemini. Uses real simulated satellite streaming typewriter visual
+    // Phase 26: sendTerminalQuery() removed to protect API quota
     fun sendTerminalQuery(query: String) {
         if (query.isBlank()) return
-        viewModelScope.launch {
-            _isThinking.value = true
-            _terminalResponse.value = ""
-            
-            var rawResponse = ""
-            val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
-            
-            if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
-                try {
-                    kotlinx.coroutines.withTimeout(15000) {
-                        val res = generateContentSafely(
-                            "You are the high-end A.SYRIA V4 brain. Analyze the following project idea or question comprehensively and give a tactical security security brief style response. Under 50 words: $query"
-                        )
-                        if (!res.isNullOrEmpty()) {
-                            rawResponse = res.trim()
-                        }
-                    }
-                    _isNeuralLinkOffline.value = false
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    _isNeuralLinkOffline.value = true
-                }
-            } else {
-                rawResponse = "[ TERMINAL ALERT ] Neural Link is offline. Please configure a valid GEMINI API KEY in the System Settings to restore active intelligence."
-            }
-
-            if (rawResponse.isEmpty() || rawResponse == offlineTerminalResponses[0]) {
-                _isNeuralLinkOffline.value = true
-                // Return high fidelity contextual feedback offline
-                rawResponse = offlineTerminalResponses[Random.nextInt(offlineTerminalResponses.size)]
-            }
-
-            // Stream response using character level Typewriter Animation in coroutine
-            _isThinking.value = false
-            for (i in 1..rawResponse.length) {
-                _terminalResponse.value = rawResponse.substring(0, i)
-                delay(30) // Elegant tech delay representing live uplink stream
-            }
-        }
+        _terminalResponse.value = if (_isArabic.value) "[ تنبيه ] المحطة العصبية معطلة لتوفير الكوتا. استخدم الأكاديمية فقط." else "[ ALERT ] Terminal AI is disabled for quota protection. Use Academy only."
     }
 
-    // Phase 25: API Quota Protection & Dynamic Academy Variation
+    // Phase 26: API Sterilization & Random Entropy Protocol
     fun generateAcademyScenarios(
         moduleNameEn: String,
         moduleNameAr: String,
@@ -811,9 +702,15 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 try {
                     val promptLocale = if (useArabic) "Arabic (العربية)" else "English"
                     val seed = System.currentTimeMillis()
+                    
+                    // Phase 26: Pick random category in Kotlin to force variety
+                    val categories = listOf("الهندسة الاجتماعية", "أمن الشبكات", "التشفير", "اختراق الهواتف", "التصيد الاحتيالي", "برمجيات الفدية")
+                    val randomCategory = categories[Random.nextInt(categories.size)]
+
                     val prompt = """
-                        Act as a Cyber-Security Examiner. Using the seed [$seed], generate a unique, NEVER-BEFORE-SEE security scenario in $promptLocale. 
-                        Focus on a random sub-topic each time (e.g., WiFi Hijacking, SIM Swapping, AI Deepfakes, firmware backdoors, Quishing). 
+                        Act as a Cyber-Security AI. Generate a unique scenario about [$randomCategory] in $promptLocale. 
+                        You MUST use this random seed: [$seed]. 
+                        The scenario must be completely different from previous ones.
                         Module context: '$moduleNameEn' / '$moduleNameAr'.
                         
                         Generate exactly 3 unique challenging scenarios. 
@@ -851,66 +748,15 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Phase 12: Adaptive Learning Feedback via Strategic Debrief with bilingual support
+    // Phase 26: generateStrategicDebrief() removed; explanation is now part of AcademyScenario
     fun generateStrategicDebrief(scenario: String, choiceText: String, useArabic: Boolean, onResponse: (String) -> Unit) {
-        viewModelScope.launch {
-            val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
-            if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
-                try {
-                    val promptLocale = if (useArabic) "Arabic (العربية)" else "English"
-                    val prompt = """
-                        The user chose '$choiceText' for the cybersecurity scenario: '$scenario'. 
-                        Explain why this choice is Secure or Insecure, and give a one-sentence tip to prevent this in real life.
-                        Output the response strictly in $promptLocale. Limit your explanation to 60 words. No introduction.
-                    """.trimIndent()
-                    val res = generateContentSafely(prompt)
-                    if (res.isNotBlank()) {
-                        onResponse(res.trim())
-                        return@launch
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-            onResponse("") // Trigger fallback
-        }
+        onResponse("")
     }
 
+    // Phase 26: analyzeResourceLink() removed to protect API quota
     fun analyzeResourceLink(url: String, resourceTitle: String = "Unknown Reference") {
-        viewModelScope.launch {
-            _isAnalyzingLink.value = true
-            _linkAnalysisResult.value = null
-            
-            val isAr = _isArabic.value
-
-            // Phase 25: Light Heuristic Analysis (Protecting Quota)
-            // Send only the URL domain context for a 1-sentence risk assessment.
-            val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
-            if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
-                try {
-                    kotlinx.coroutines.withTimeout(15000) {
-                        val promptLocale = if (isAr) "Arabic (العربية)" else "English"
-                        val prompt = """
-                            Execute Light Heuristic Analysis on this URL: $url
-                            Title: $resourceTitle
-                            Provide a 1-sentence security risk assessment based on the domain name and known common patterns in $promptLocale. 
-                            Format: "[RISK_SCORE/100] Assessment sentence."
-                        """.trimIndent()
-                        
-                        val res = generateContentSafely(prompt)
-                        _linkAnalysisResult.value = res.trim()
-                    }
-                    _isNeuralLinkOffline.value = false
-                } catch (e: Exception) {
-                    _isNeuralLinkOffline.value = true
-                    _linkAnalysisResult.value = if (isAr) "فشل الاتصال العصبي أثناء فحص الرابط: ${e.message}" else "Neural uplink failed during link analysis: ${e.message}"
-                }
-            } else {
-                _isNeuralLinkOffline.value = true
-                _linkAnalysisResult.value = if (isAr) "[ تنبيه نهائي ] العقدة العصبية غير متصلة. يرجى إضافة مفتاح Gemini API صالح في إعدادات النظام." else "[ TERMINAL ALERT ] Neural Link is offline. Please configure a valid GEMINI API KEY in the System Settings to restore active intelligence."
-            }
-            _isAnalyzingLink.value = false
-        }
+        _isAnalyzingLink.value = false
+        _linkAnalysisResult.value = if (_isArabic.value) "الفحص العصبي معطل حالياً لتوفير الطاقة." else "Neural scanning is currently disabled to save quota."
     }
 
     fun clearLinkAnalysis() {
