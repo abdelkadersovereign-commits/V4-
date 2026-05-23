@@ -735,7 +735,7 @@ fun NeuralModuleTestView(
                     val parsed = mutableListOf<AcademyScenario>()
                     for (i in 0 until array.length()) {
                         val itemObj = array.getJSONObject(i)
-                        val id = itemObj.optString("id", "${java.util.UUID.randomUUID()}")
+                        val id = itemObj.optString("id", "gen_${System.currentTimeMillis()}_$i")
                         val scenarioText = itemObj.getString("scenario")
                         val optsArr = itemObj.getJSONArray("options")
                         val options = mutableListOf<String>()
@@ -747,34 +747,33 @@ fun NeuralModuleTestView(
                         parsed.add(AcademyScenario(id, scenarioText, options, correct, explanation))
                     }
                     if (parsed.isNotEmpty()) {
-                        // Register all new IDs and store scenario text for future avoid-list
+                        // IMPORTANT: We only use generated scenarios if successful to avoid repetition
                         parsed.forEach { usedScenarioIds.add(it.id) }
                         scenariosList = parsed.shuffled()
                     } else {
-                        // For offline, filter out previously shown scenarios
-                        val remaining = offlineScenarios.filter { it.id !in usedScenarioIds }
-                        val pool = if (remaining.isEmpty()) offlineScenarios else remaining
-                        pool.forEach { usedScenarioIds.add(it.id) }
-                        scenariosList = pool.shuffled()
+                        // Fallback only if JSON was empty
+                        scenariosList = offlineScenarios.shuffled().take(3)
                     }
                 } catch (e: Exception) {
-                    e.printStackTrace()
-                    val remaining = offlineScenarios.filter { it.id !in usedScenarioIds }
-                    val pool = if (remaining.isEmpty()) { usedScenarioIds.clear(); offlineScenarios } else remaining
-                    pool.forEach { usedScenarioIds.add(it.id) }
-                    scenariosList = pool.shuffled()
+                    // Log error but don't just silently show old questions if we can avoid it
+                    debriefText = "ERROR_PARSING_NEURAL_DATA: ${e.message}"
+                    scenariosList = offlineScenarios.shuffled().take(3)
                 } finally {
                     isGeneratingScenarios = false
                 }
             },
             onFailure = { error ->
-                val remaining = offlineScenarios.filter { it.id !in usedScenarioIds }
-                val pool = if (remaining.isEmpty()) { usedScenarioIds.clear(); offlineScenarios } else remaining
-                pool.forEach { usedScenarioIds.add(it.id) }
-                scenariosList = pool.shuffled()
+                // Force a notification to the user that we are in offline mode
+                val errorMsg = error.message ?: "Unknown Connection Error"
+                println("Academy Generation Failed: $errorMsg")
+                
+                // Still show some questions so the app doesn't break, but clear the used list to refresh
+                if (usedScenarioIds.size > 10) usedScenarioIds.clear() 
+                scenariosList = offlineScenarios.shuffled().take(3)
+                
                 isGeneratingScenarios = false
-                if (error.message?.contains("503") == true || error.message?.contains("BUSY") == true) {
-                    cooldownTimer = 10
+                if (errorMsg.contains("503") || errorMsg.contains("BUSY") || errorMsg.contains("429")) {
+                    cooldownTimer = 15
                 }
             }
         )

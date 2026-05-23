@@ -662,10 +662,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val activeNetwork = connectivityManager.activeNetwork
         val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
 
-        // Check for actual validated internet (works with VPN, WiFi, LTE, etc.)
+        // Check for basic internet capability - being less strict to avoid "false offline" states
         val hasInternet = capabilities != null &&
-            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
 
         if (hasInternet) {
             when {
