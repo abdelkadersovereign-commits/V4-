@@ -322,6 +322,9 @@ fun NeuralModuleTestView(
     var isGeneratingDebrief by remember { mutableStateOf(false) }
     var hasAnsweredCurrent by remember { mutableStateOf(false) }
 
+    // Track used scenario IDs across all API calls to avoid repetition
+    val usedScenarioIds = remember(module.id) { mutableSetOf<String>() }
+
     // Multi-Language high fidelity offline scenarios per module
     val offlineScenarios = remember(module.id) {
         when (module.id) {
@@ -658,6 +661,7 @@ fun NeuralModuleTestView(
             moduleNameEn = module.titleEn,
             moduleNameAr = module.titleAr,
             useArabic = isAr,
+            usedIds = usedScenarioIds.toList(),
             onSuccess = { jsonString ->
                 try {
                     val root = JSONObject(jsonString)
@@ -677,19 +681,31 @@ fun NeuralModuleTestView(
                         parsed.add(AcademyScenario(id, scenarioText, options, correct, explanation))
                     }
                     if (parsed.isNotEmpty()) {
+                        // Register all new IDs as used so they won't repeat
+                        parsed.forEach { usedScenarioIds.add(it.id) }
                         scenariosList = parsed.shuffled()
                     } else {
-                        scenariosList = offlineScenarios.shuffled()
+                        // For offline, filter out previously shown scenarios
+                        val remaining = offlineScenarios.filter { it.id !in usedScenarioIds }
+                        val pool = if (remaining.isEmpty()) offlineScenarios else remaining
+                        pool.forEach { usedScenarioIds.add(it.id) }
+                        scenariosList = pool.shuffled()
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    scenariosList = offlineScenarios.shuffled()
+                    val remaining = offlineScenarios.filter { it.id !in usedScenarioIds }
+                    val pool = if (remaining.isEmpty()) { usedScenarioIds.clear(); offlineScenarios } else remaining
+                    pool.forEach { usedScenarioIds.add(it.id) }
+                    scenariosList = pool.shuffled()
                 } finally {
                     isGeneratingScenarios = false
                 }
             },
             onFailure = { error ->
-                scenariosList = offlineScenarios.shuffled()
+                val remaining = offlineScenarios.filter { it.id !in usedScenarioIds }
+                val pool = if (remaining.isEmpty()) { usedScenarioIds.clear(); offlineScenarios } else remaining
+                pool.forEach { usedScenarioIds.add(it.id) }
+                scenariosList = pool.shuffled()
                 isGeneratingScenarios = false
                 if (error.message?.contains("503") == true || error.message?.contains("BUSY") == true) {
                     cooldownTimer = 10

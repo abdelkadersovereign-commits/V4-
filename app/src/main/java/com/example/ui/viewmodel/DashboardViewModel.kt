@@ -279,7 +279,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun executeNeuralProxyRequest(prompt: String, apiKey: String): String {
-        // Phase 25 Structure: Standard Gemini 3.5 Flash Request (Quota Protection: Removed Tools)
         val json = JSONObject().apply {
             put("contents", org.json.JSONArray().put(
                 JSONObject().apply {
@@ -288,63 +287,86 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     ))
                 }
             ))
-            // Quota Shield: url_context and tools removed to minimize token overhead and prevent 429 errors
-        }
-        
-        val body = json.toString().toRequestBody("application/json".toMediaType())
-        // Hardened Endpoint
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
-        
-        val requestBuilder = Request.Builder()
-            .url(url)
-            .post(body)
-            .header("Content-Type", "application/json")
-            .header("x-goog-api-key", apiKey)
-        
-        // Phase 23: Sovereignty Identity Headers
-        if (_projectId.value.isNotBlank()) {
-            requestBuilder.header("x-goog-project-id", _projectId.value)
-        }
-        if (_projectNumber.value.isNotBlank()) {
-            requestBuilder.header("x-goog-project-number", _projectNumber.value)
-        }
-        
-        val request = requestBuilder.build()
-        val response = okHttpClient.newCall(request).execute()
-        
-        if (!response.isSuccessful) {
-            val code = response.code
-            val errBody = response.body?.string() ?: ""
-            if (code == 429) {
-                // Phase 25: Quota Buffer Message
-                throw Exception("Neural Buffer Full (Error 429) - يتم الآن إعادة شحن الطاقة العصبية.. يرجى الانتظار 30 ثانية")
-            }
-            if (code == 503) {
-                // Phase 26: Service Stability 
-                throw Exception("UPLINK BUSY - السيرفر مشغول حالياً، يرجى المحاولة بعد قليل")
-            }
-            throw Exception(if (code == 403) "Regional Block - Enable Neural Proxy" else if (code == 401) "Invalid API Key or Project ID" else "Error $code: $errBody")
-        }
-        
-        val resBody = response.body?.string() ?: ""
-        val jsonRes = JSONObject(resBody)
-        
-        // Extract Usage Metadata for Terminal Display
-        val usage = jsonRes.optJSONObject("usageMetadata")
-        if (usage != null) {
-            val promptTokens = usage.optInt("promptTokenCount")
-            val candidateTokens = usage.optInt("candidatesTokenCount")
-            val totalTokens = usage.optInt("totalTokenCount")
-            _terminalResponse.value += "\n\n[ NEURAL LOAD: $totalTokens Tokens (In: $promptTokens, Out: $candidateTokens) ]"
         }
 
-        return jsonRes.getJSONArray("candidates")
-            .getJSONObject(0)
-            .getJSONObject("content")
-            .getJSONArray("parts")
-            .getJSONObject(0)
-            .getString("text")
+        val body = json.toString().toRequestBody("application/json".toMediaType())
+
+        // Neural Proxy mode: use alternative endpoint routing with extended timeouts and bypass headers
+        val proxyEnabled = _isNeuralProxy.value
+        val endpointUrls = if (proxyEnabled) listOf(
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
+            "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"
+        ) else listOf(
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
+        )
+
+        val activeClient = if (proxyEnabled) {
+            OkHttpClient.Builder()
+                .connectTimeout(45, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
+                .build()
+        } else {
+            okHttpClient
+        }
+
+        var lastException: Exception? = null
+        for (url in endpointUrls) {
+            try {
+                val requestBuilder = Request.Builder()
+                    .url(url)
+                    .post(body)
+                    .header("Content-Type", "application/json")
+                    .header("x-goog-api-key", apiKey)
+
+                if (proxyEnabled) {
+                    requestBuilder
+                        .header("User-Agent", "Dalvik/2.1.0 (Linux; U; Android 14; SM-G998B Build/UP1A.231005.007)")
+                        .header("Accept-Language", "en-US,en;q=0.9")
+                        .header("X-Forwarded-For", "104.18.2.56")
+                }
+                if (_projectId.value.isNotBlank()) requestBuilder.header("x-goog-project-id", _projectId.value)
+                if (_projectNumber.value.isNotBlank()) requestBuilder.header("x-goog-project-number", _projectNumber.value)
+
+                val request = requestBuilder.build()
+                val response = activeClient.newCall(request).execute()
+
+                if (!response.isSuccessful) {
+                    val code = response.code
+                    val errBody = response.body?.string() ?: ""
+                    if (code == 429) throw Exception("Neural Buffer Full (Error 429) - يتم الآن إعادة شحن الطاقة العصبية.. يرجى الانتظار 30 ثانية")
+                    if (code == 503) throw Exception("UPLINK BUSY - السيرفر مشغول حالياً، يرجى المحاولة بعد قليل")
+                    lastException = Exception(if (code == 403) "Regional Block - Enable Neural Proxy" else if (code == 401) "Invalid API Key or Project ID" else "Error $code: $errBody")
+                    continue
+                }
+
+                val resBody = response.body?.string() ?: ""
+                val jsonRes = JSONObject(resBody)
+
+                val usage = jsonRes.optJSONObject("usageMetadata")
+                if (usage != null) {
+                    val totalTokens = usage.optInt("totalTokenCount")
+                    val promptTokens = usage.optInt("promptTokenCount")
+                    val candidateTokens = usage.optInt("candidatesTokenCount")
+                    _terminalResponse.value += "\n\n[ NEURAL LOAD: $totalTokens Tokens (In: $promptTokens, Out: $candidateTokens) ]"
+                }
+
+                return jsonRes.getJSONArray("candidates")
+                    .getJSONObject(0)
+                    .getJSONObject("content")
+                    .getJSONArray("parts")
+                    .getJSONObject(0)
+                    .getString("text")
+            } catch (e: Exception) {
+                if (e.message?.contains("429") == true || e.message?.contains("Neural Buffer") == true) throw e
+                if (e.message?.contains("UPLINK BUSY") == true) throw e
+                lastException = e
+            }
+        }
+        throw lastException ?: Exception("Neural link failed")
     }
+
 
     fun setStealthMode(enabled: Boolean) {
         viewModelScope.launch {
@@ -634,11 +656,34 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     _connectionType.value = "CONNECTED"
                 }
             }
+            // Fetch real public IP in background
+            viewModelScope.launch(Dispatchers.IO) {
+                _ipAddress.value = fetchPublicIp()
+            }
         } else {
             _connectionType.value = "DISCONNECTED"
+            _ipAddress.value = "N/A"
         }
+    }
 
-        _ipAddress.value = extractLocalIp()
+    private fun fetchPublicIp(): String {
+        val endpoints = listOf(
+            "https://api.ipify.org",
+            "https://checkip.amazonaws.com",
+            "https://ifconfig.me/ip"
+        )
+        for (endpoint in endpoints) {
+            try {
+                val req = Request.Builder().url(endpoint).get()
+                    .header("User-Agent", "Dalvik/2.1.0 (Linux; Android)").build()
+                val resp = okHttpClient.newCall(req).execute()
+                if (resp.isSuccessful) {
+                    val ip = resp.body?.string()?.trim() ?: continue
+                    if (ip.isNotBlank() && ip.length < 50) return ip
+                }
+            } catch (_: Exception) {}
+        }
+        return extractLocalIp()
     }
 
     private fun extractLocalIp(): String {
@@ -650,14 +695,14 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 while (addrs.hasMoreElements()) {
                     val addr = addrs.nextElement()
                     if (!addr.isLoopbackAddress && addr is Inet4Address) {
-                        return addr.hostAddress ?: "127.0.0.1"
+                        return addr.hostAddress ?: "N/A"
                     }
                 }
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        return "127.0.0.1"
+        return "N/A"
     }
 
     // Phase 26: fetchStrategicIntelligence() removed to protect API quota
@@ -687,11 +732,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         _terminalResponse.value = if (_isArabic.value) "[ تنبيه ] المحطة العصبية معطلة لتوفير الكوتا. استخدم الأكاديمية فقط." else "[ ALERT ] Terminal AI is disabled for quota protection. Use Academy only."
     }
 
-    // Phase 26: API Sterilization & Random Entropy Protocol
     fun generateAcademyScenarios(
         moduleNameEn: String,
         moduleNameAr: String,
         useArabic: Boolean,
+        usedIds: List<String> = emptyList(),
         onSuccess: (String) -> Unit,
         onFailure: (Throwable) -> Unit
     ) {
@@ -702,32 +747,54 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 try {
                     val promptLocale = if (useArabic) "Arabic (العربية)" else "English"
                     val seed = System.currentTimeMillis()
-                    
-                    // Phase 26: Pick random category in Kotlin to force variety
-                    val categories = listOf("الهندسة الاجتماعية", "أمن الشبكات", "التشفير", "اختراق الهواتف", "التصيد الاحتيالي", "برمجيات الفدية")
-                    val randomCategory = categories[Random.nextInt(categories.size)]
+
+                    val allCategories = listOf(
+                        "الهندسة الاجتماعية وانتحال الهوية",
+                        "أمن الشبكات وهجمات MITM",
+                        "التشفير والمفاتيح الرقمية",
+                        "اختراق الهواتف والتطبيقات",
+                        "التصيد الاحتيالي عبر البريد والرسائل",
+                        "برمجيات الفدية والفيروسات",
+                        "الجريمة الإلكترونية والقانون",
+                        "أمن كلمات المرور والمصادقة الثنائية",
+                        "الخصوصية الرقمية وتتبع البيانات",
+                        "ثغرات التطبيقات وCVE",
+                        "الـ Dark Web والشبكات المجهولة",
+                        "هجمات التشفير والبلوكشين"
+                    )
+                    val randomCategory = allCategories[Random.nextInt(allCategories.size)]
+                    val avoidClause = if (usedIds.isNotEmpty())
+                        "CRITICAL: You MUST NOT repeat any scenario with these previously-used IDs: [${usedIds.take(20).joinToString(", ")}]. Create entirely new scenarios only."
+                    else ""
 
                     val prompt = """
-                        Act as a Cyber-Security AI. Generate a unique scenario about [$randomCategory] in $promptLocale. 
-                        You MUST use this random seed: [$seed]. 
-                        The scenario must be completely different from previous ones.
-                        Module context: '$moduleNameEn' / '$moduleNameAr'.
+                        You are a Senior Cybersecurity Trainer AI. Generate BRAND NEW scenarios never seen before.
+                        Random entropy seed (use this for uniqueness): [$seed]
+                        Topic: [$randomCategory]
+                        Language: $promptLocale
+                        Module: '$moduleNameEn' / '$moduleNameAr'
+                        $avoidClause
                         
-                        Generate exactly 3 unique challenging scenarios. 
-                        Ensure the JSON structure is strictly: 
+                        Rules:
+                        - Each scenario must describe a REAL-WORLD attack or threat situation
+                        - Options must be plausible and educational
+                        - Explanation must teach a security lesson
+                        - NEVER repeat previous topics
+                        
+                        Generate exactly 3 unique challenging scenarios in this STRICT JSON:
                         {
                           "scenarios": [
                             {
-                              "id": "${java.util.UUID.randomUUID()}",
-                              "scenario": "string", 
-                              "options": ["opt1", "opt2", "opt3", "opt4"], 
-                              "correctIndex": int, 
-                              "explanation": "Tactical technical breakdown of why the correct choice is secure..."
+                              "id": "unique_${seed}_1",
+                              "scenario": "Detailed realistic attack scenario...",
+                              "options": ["Option A", "Option B", "Option C", "Option D"],
+                              "correctIndex": 0,
+                              "explanation": "Security lesson explaining why..."
                             }
                           ]
                         }
                         
-                        Output strictly JSON. No markdown.
+                        Output ONLY valid JSON. No markdown. No explanation outside JSON.
                     """.trimIndent()
                     val res = generateContentSafely(prompt)
                     // Remove markdown wrapper if any

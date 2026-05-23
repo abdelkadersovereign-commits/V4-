@@ -497,7 +497,12 @@ fun DashboardScreen(
 
                     item {
                         Spacer(modifier = Modifier.height(12.dp))
-                        RadiantDigitalClock(prayerName = nextPrayerName, isAr = isAr)
+                        RadiantDigitalClock(
+                            prayerName = nextPrayerName,
+                            prayerTime = nextPrayerTime,
+                            prayerCountdown = nextPrayerCountdown,
+                            isAr = isAr
+                        )
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
@@ -2262,9 +2267,25 @@ fun QiblaCompass(
     }
 }
 
-// Phase 22: High-End Radiant Digital Neon Clock
+// Prayer name mapping to Arabic
+private fun prayerNameToArabic(name: String): String = when (name.uppercase()) {
+    "FAJR" -> "الفجر"
+    "SUNRISE" -> "الشروق"
+    "DHUHR" -> "الظهر"
+    "ASR" -> "العصر"
+    "MAGHRIB" -> "المغرب"
+    "ISHA" -> "العشاء"
+    "NONE" -> "الفجر"
+    else -> name
+}
+
 @Composable
-fun RadiantDigitalClock(prayerName: String, isAr: Boolean) {
+fun RadiantDigitalClock(
+    prayerName: String,
+    prayerTime: String = "00:00",
+    prayerCountdown: String = "00:00:00",
+    isAr: Boolean
+) {
     var currentTime by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
         val sdf = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.ENGLISH)
@@ -2274,79 +2295,209 @@ fun RadiantDigitalClock(prayerName: String, isAr: Boolean) {
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "neonPulse")
-    val bloomScale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.05f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "bloomScale"
+    val infiniteTransition = rememberInfiniteTransition(label = "prayerPulse")
+    val glow by infiniteTransition.animateFloat(
+        initialValue = 0.6f, targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(tween(1800, easing = LinearEasing), RepeatMode.Reverse),
+        label = "glow"
     )
+    val amberGlow by infiniteTransition.animateFloat(
+        initialValue = 0.5f, targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing), RepeatMode.Reverse),
+        label = "amberGlow"
+    )
+
+    val arabicPrayerName = prayerNameToArabic(prayerName)
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(100.dp)
             .background(
-                color = Color.Black.copy(alpha = 0.4f),
-                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color(0xFF010D1A), Color(0xFF000507))
+                ),
+                shape = RoundedCornerShape(16.dp)
             )
             .border(
-                1.dp,
-                CyberCyan.copy(alpha = 0.3f),
-                RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-            ),
-        contentAlignment = Alignment.Center
+                width = 1.dp,
+                brush = Brush.horizontalGradient(
+                    listOf(CyberCyan.copy(alpha = 0.1f), CyberCyan.copy(alpha = 0.4f * glow), CyberCyan.copy(alpha = 0.1f))
+                ),
+                shape = RoundedCornerShape(16.dp)
+            )
+            .padding(16.dp)
     ) {
-        // CRT Scanlines Effect
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val linesCount = 20
-            val lineSpacing = size.height / linesCount
-            for (i in 0..linesCount) {
-                drawLine(
-                    color = CyberCyan.copy(alpha = 0.05f),
-                    start = androidx.compose.ui.geometry.Offset(0f, i * lineSpacing),
-                    end = androidx.compose.ui.geometry.Offset(size.width, i * lineSpacing),
-                    strokeWidth = 1f
-                )
+        // Scanlines
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val spacing = 8.dp.toPx()
+            var y = 0f
+            while (y < size.height) {
+                drawLine(CyberCyan.copy(alpha = 0.03f), androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width, y), 1f)
+                y += spacing
             }
         }
 
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = if (isAr) "[ $prayerName القادم ]" else "[ NEXT UPLINK: $prayerName ]",
-                color = CyberCyan.copy(alpha = 0.8f),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 2.sp
-            )
-            
-            Spacer(modifier = Modifier.height(4.dp))
-            
+            // Header row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .background(CyberCyan.copy(alpha = 0.08f), RoundedCornerShape(4.dp))
+                        .border(0.5.dp, CyberCyan.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = "[ SAT_CLOCK ]",
+                        color = CyberCyan.copy(alpha = 0.7f),
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.5.sp
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .background(AmberZen.copy(alpha = 0.08f), RoundedCornerShape(4.dp))
+                        .border(0.5.dp, AmberZen.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = "PRAYER_SYNC",
+                        color = AmberZen.copy(alpha = 0.7f),
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.5.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Main digital clock
             Text(
                 text = currentTime,
                 color = CyberCyan,
-                fontSize = 42.sp,
+                fontSize = 46.sp,
                 fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Light,
-                letterSpacing = 4.sp,
-                modifier = Modifier.graphicsLayer {
-                    scaleX = bloomScale
-                    scaleY = bloomScale
-                },
+                fontWeight = FontWeight.Thin,
+                letterSpacing = 6.sp,
                 style = TextStyle(
                     shadow = androidx.compose.ui.graphics.Shadow(
-                        color = CyberCyan.copy(alpha = 0.8f),
-                        blurRadius = 25f * bloomScale
+                        color = CyberCyan.copy(alpha = 0.7f * glow),
+                        blurRadius = 30f
                     )
                 )
             )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Divider
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .height(0.5.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(Color.Transparent, AmberZen.copy(alpha = 0.5f), Color.Transparent)
+                        )
+                    )
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Prayer section
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Next prayer name - Arabic
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (isAr) "الصلاة القادمة" else "NEXT PRAYER",
+                        color = CyberCyan.copy(alpha = 0.5f),
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = arabicPrayerName,
+                        color = AmberZen.copy(alpha = amberGlow),
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Light,
+                        style = TextStyle(
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = AmberZen.copy(alpha = 0.5f),
+                                blurRadius = 15f
+                            )
+                        )
+                    )
+                    if (!isAr) {
+                        Text(
+                            text = prayerName.uppercase(),
+                            color = CyberCyan.copy(alpha = 0.4f),
+                            fontSize = 8.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+
+                // Vertical divider
+                Box(modifier = Modifier.width(0.5.dp).height(56.dp).background(CyberCyan.copy(alpha = 0.2f)))
+
+                // Prayer time and countdown
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (isAr) "الوقت" else "TIME",
+                        color = CyberCyan.copy(alpha = 0.5f),
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = prayerTime,
+                        color = CyberCyan.copy(alpha = glow),
+                        fontSize = 22.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Light,
+                        letterSpacing = 2.sp,
+                        style = TextStyle(
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = CyberCyan.copy(alpha = 0.6f),
+                                blurRadius = 12f
+                            )
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(4.dp).background(AmberZen.copy(alpha = amberGlow), RoundedCornerShape(50)))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = prayerCountdown,
+                            color = AmberZen.copy(alpha = 0.8f),
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                    Text(
+                        text = if (isAr) "متبقي" else "REMAINING",
+                        color = CyberCyan.copy(alpha = 0.4f),
+                        fontSize = 7.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
