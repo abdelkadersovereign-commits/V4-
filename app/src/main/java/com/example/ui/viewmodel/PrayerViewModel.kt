@@ -69,7 +69,14 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
                     _currentLocation.value = coords
                     _qiblaDirection.value = com.batoulapps.adhan.Qibla(coords).direction
                 }
-        } catch (e: SecurityException) {
+                .addOnFailureListener { e ->
+                    // Handle failure (e.g. Google Play Services unavailable)
+                    val fallback = Coordinates(33.5138, 36.2765)
+                    _currentLocation.value = fallback
+                    _qiblaDirection.value = com.batoulapps.adhan.Qibla(fallback).direction
+                }
+        } catch (e: Exception) {
+            // Catch SecurityException, IllegalStateException, or any Play Services error
             val fallback = Coordinates(33.5138, 36.2765)
             _currentLocation.value = fallback
             _qiblaDirection.value = com.batoulapps.adhan.Qibla(fallback).direction
