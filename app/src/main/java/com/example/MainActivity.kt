@@ -102,13 +102,16 @@ class MainActivity : FragmentActivity() {
     }
   }
 
-  override fun onCreate(savedInstanceState: Bundle?) {
-    enableEdgeToEdge()
-    super.onCreate(savedInstanceState)
-
-    // Request notification + location permissions on first launch
+  override fun onStart() {
+    super.onStart()
+    // Launch permission dialog only after Activity is STARTED (required by AndroidX)
     requestEssentialPermissions()
-    
+  }
+
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    enableEdgeToEdge()
+
     // Initialize Sovereign Pulse Protocol (WorkManager)
     val workRequest = PeriodicWorkRequestBuilder<NotificationWorker>(4, TimeUnit.HOURS)
       .setInitialDelay(15, TimeUnit.MINUTES)
