@@ -417,8 +417,11 @@ class MainActivity : FragmentActivity() {
                            triggerBiometricAuth(title, sub, onOk)
                         }
                       )
-                      "academy" -> AcademyScreen()
-                      "resources" -> ResourcesScreen()
+                      "academy" -> AcademyScreen(viewModel = vm)
+                      "resources" -> ResourcesScreen(
+                        viewModel = vm,
+                        onClose = { activeTab = "home" }
+                      )
                       "settings" -> SettingsScreen(
                         viewModel = vm,
                         onClose = { activeTab = "home" },
