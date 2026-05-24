@@ -346,7 +346,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     requestBuilder
                         .header("User-Agent", "Dalvik/2.1.0 (Linux; U; Android 14; SM-G998B Build/UP1A.231005.007)")
                         .header("Accept-Language", "en-US,en;q=0.9")
-                        .header("X-Forwarded-For", "104.18.2.56")
                 }
                 if (_projectId.value.isNotBlank()) requestBuilder.header("x-goog-project-id", _projectId.value)
                 if (_projectNumber.value.isNotBlank()) requestBuilder.header("x-goog-project-number", _projectNumber.value)
@@ -503,9 +502,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             _isTestingKey.value = true
             val apiKey = if (_customApiKey.value.isNotBlank()) _customApiKey.value else com.asyria.v4.BuildConfig.GEMINI_API_KEY
-            if (apiKey.isEmpty() || apiKey.contains("MY_GEMINI_API_KEY") || _projectName.value.isBlank() || _projectId.value.isBlank() || _projectNumber.value.isBlank()) {
+            if (apiKey.isEmpty() || apiKey.contains("MY_GEMINI_API_KEY")) {
                 _isNeuralLinkOffline.value = true
-                _terminalResponse.value = "[ TERMINAL ALERT ] All Project Identity Fields (API Key, Project ID, Project Number) are required."
+                _terminalResponse.value = "[ TERMINAL ALERT ] Gemini API Key is required. Get yours free at: aistudio.google.com/app/apikey"
                 _isTestingKey.value = false
                 return@launch
             }
