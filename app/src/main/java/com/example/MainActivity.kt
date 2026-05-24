@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
@@ -66,22 +67,12 @@ import androidx.lifecycle.LifecycleEventObserver
 class MainActivity : FragmentActivity() {
   private var isSessionAuthenticated = false
 
-  // Runtime permission launcher for notifications + location (Android 13+)
+  // Runtime permission launcher — only launched AFTER biometric succeeds to avoid dialog conflict
   private val permissionLauncher = registerForActivityResult(
     ActivityResultContracts.RequestMultiplePermissions()
-  ) { results ->
-    val notifGranted = results[Manifest.permission.POST_NOTIFICATIONS] ?: true
-    val locationGranted = results[Manifest.permission.ACCESS_FINE_LOCATION]
-      ?: results[Manifest.permission.ACCESS_COARSE_LOCATION] ?: true
-    if (!notifGranted) {
-      Toast.makeText(this, "⚠ الإشعارات معطّلة — فعّلها من إعدادات التطبيق", Toast.LENGTH_LONG).show()
-    }
-    if (!locationGranted) {
-      Toast.makeText(this, "⚠ الموقع معطّل — مواقيت الصلاة ستكون تقريبية", Toast.LENGTH_LONG).show()
-    }
-  }
+  ) { _ -> /* silently accepted; app works with fallback coords if location denied */ }
 
-  private fun requestEssentialPermissions() {
+  fun requestEssentialPermissions() {
     val needed = mutableListOf<String>()
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
       if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -93,19 +84,9 @@ class MainActivity : FragmentActivity() {
       != PackageManager.PERMISSION_GRANTED) {
       needed.add(Manifest.permission.ACCESS_FINE_LOCATION)
     }
-    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
-      != PackageManager.PERMISSION_GRANTED) {
-      needed.add(Manifest.permission.ACCESS_COARSE_LOCATION)
-    }
     if (needed.isNotEmpty()) {
       permissionLauncher.launch(needed.toTypedArray())
     }
-  }
-
-  override fun onStart() {
-    super.onStart()
-    // Launch permission dialog only after Activity is STARTED (required by AndroidX)
-    requestEssentialPermissions()
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -130,16 +111,31 @@ class MainActivity : FragmentActivity() {
           val prayerVm: com.example.ui.viewmodel.PrayerViewModel = viewModel()
           val isAr by vm.isArabic.collectAsState()
 
-          fun triggerBiometricAuth(title: String, subtitle: String, onCancel: () -> Unit = {}, onSuccess: () -> Unit) {
+          fun triggerBiometricAuth(title: String, subtitle: String, onSuccess: () -> Unit) {
+            // Check device capability BEFORE showing prompt to avoid immediate crash
+            val biometricManager = BiometricManager.from(this@MainActivity)
+            val canAuth = biometricManager.canAuthenticate(
+              BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
+            if (canAuth != BiometricManager.BIOMETRIC_SUCCESS) {
+              // Device has no biometric/PIN enrolled — grant access silently
+              isSessionAuthenticated = true
+              onSuccess()
+              return
+            }
+
             val executor = ContextCompat.getMainExecutor(this@MainActivity)
             val biometricPrompt = BiometricPrompt(this@MainActivity, executor,
               object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                   super.onAuthenticationError(errorCode, errString)
-                  if (errorCode == BiometricPrompt.ERROR_USER_CANCELED || errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON || errorCode == BiometricPrompt.ERROR_CANCELED) {
-                    onCancel()
-                  } else {
-                    Toast.makeText(applicationContext, "Auth Error: $errString", Toast.LENGTH_SHORT).show()
+                  when (errorCode) {
+                    // User deliberately pressed back/cancel → close app
+                    BiometricPrompt.ERROR_USER_CANCELED,
+                    BiometricPrompt.ERROR_NEGATIVE_BUTTON -> finish()
+                    // System-initiated cancel (e.g. another dialog appeared) → do NOT close, just ignore
+                    BiometricPrompt.ERROR_CANCELED -> { /* retry on next ON_START */ }
+                    else -> Toast.makeText(applicationContext, "Auth Error: $errString", Toast.LENGTH_SHORT).show()
                   }
                 }
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
@@ -149,14 +145,17 @@ class MainActivity : FragmentActivity() {
                 }
                 override fun onAuthenticationFailed() {
                   super.onAuthenticationFailed()
-                  Toast.makeText(applicationContext, "Auth Failed", Toast.LENGTH_SHORT).show()
+                  // Wrong fingerprint — prompt stays open, no action needed
                 }
               })
 
             val promptInfo = BiometricPrompt.PromptInfo.Builder()
               .setTitle(title)
               .setSubtitle(subtitle)
-              .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG or androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+              .setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                BiometricManager.Authenticators.DEVICE_CREDENTIAL
+              )
               .build()
 
             biometricPrompt.authenticate(promptInfo)
@@ -166,9 +165,10 @@ class MainActivity : FragmentActivity() {
             triggerBiometricAuth(
               title = if (isAr) "تأكيد الهوية السيادية" else "SOVEREIGN IDENTITY VERIFIED",
               subtitle = if (isAr) "مطلوب بصمة الدخول لفك تشفير النظام" else "Biometric uplink required to decrypt system",
-              onCancel = { finish() },
-              onSuccess = { 
+              onSuccess = {
                 Toast.makeText(applicationContext, "Neural Interface Unlocked", Toast.LENGTH_SHORT).show()
+                // Request permissions AFTER biometric — prevents dialog conflict crash
+                requestEssentialPermissions()
               }
             )
           }
