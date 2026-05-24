@@ -442,7 +442,7 @@ class MainActivity : FragmentActivity() {
                               navController.navigate("scanner")
                             },
                             onVaultLockRequest = { title, sub, success ->
-                              triggerBiometricAuth(title, sub, onCancel = {}, onSuccess = success)
+                              triggerBiometricAuth(title, sub, onSuccess = success)
                             }
                           )
                         }
@@ -469,7 +469,7 @@ class MainActivity : FragmentActivity() {
                           navController.navigate("about")
                         },
                         onLockRequest = { title, sub, success ->
-                          triggerBiometricAuth(title, sub, onCancel = {}, onSuccess = success)
+                          triggerBiometricAuth(title, sub, onSuccess = success)
                         }
                       )
                     }
