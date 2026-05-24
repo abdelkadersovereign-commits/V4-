@@ -185,14 +185,11 @@ class MainActivity : FragmentActivity() {
                 }
                 Lifecycle.Event.ON_RESUME -> {
                   vm.startSensors()
-                  // Only update location if already authenticated to avoid background resource contention
                   if (isSessionAuthenticated) {
                     prayerVm.updateLocation()
                   }
                 }
-                Lifecycle.Event.ON_STOP -> {
-                  // Keep session authenticated during temporary backgrounding (like biometric dialog)
-                }
+                Lifecycle.Event.ON_STOP -> { }
                 Lifecycle.Event.ON_PAUSE -> vm.stopSensors()
                 else -> {}
               }
@@ -413,8 +410,9 @@ class MainActivity : FragmentActivity() {
                   Box(modifier = Modifier.padding(innerPadding)) {
                     when (activeTab) {
                       "home" -> DashboardScreen(
-                        onLinkScannerRequest = { navController.navigate("link_scanner") },
-                        onAboutRequest = { navController.navigate("about") },
+                        viewModel = vm,
+                        prayerViewModel = prayerVm,
+                        onNavigateToScanner = { navController.navigate("link_scanner") },
                         onVaultLockRequest = { title, sub, onOk -> 
                            triggerBiometricAuth(title, sub, onOk)
                         }
@@ -422,7 +420,9 @@ class MainActivity : FragmentActivity() {
                       "academy" -> AcademyScreen()
                       "resources" -> ResourcesScreen()
                       "settings" -> SettingsScreen(
-                        onBack = { activeTab = "home" },
+                        viewModel = vm,
+                        onClose = { activeTab = "home" },
+                        onOpenAbout = { navController.navigate("about") },
                         onLockRequest = { title, sub, onOk ->
                            triggerBiometricAuth(title, sub, onOk)
                         }
@@ -432,7 +432,7 @@ class MainActivity : FragmentActivity() {
                 }
               }
             }
-            composable("link_scanner") { LinkScannerScreen(onBack = { navController.popBackStack() }) }
+            composable("link_scanner") { LinkScannerScreen(viewModel = vm, onBack = { navController.popBackStack() }) }
             composable("about") { AboutScreen(onBack = { navController.popBackStack() }) }
           }
         }
