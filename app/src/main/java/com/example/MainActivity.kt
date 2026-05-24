@@ -55,6 +55,8 @@ import com.example.ui.screens.ResourcesScreen
 import com.example.ui.screens.SplashScreen
 import com.example.ui.screens.LinkScannerScreen
 import com.example.ui.screens.AboutScreen
+import com.example.ui.screens.CyberGlossaryScreen
+import com.example.ui.screens.SecurityChecklistScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.AmberZen
@@ -67,6 +69,7 @@ import androidx.lifecycle.LifecycleEventObserver
 class MainActivity : FragmentActivity() {
   private var isSessionAuthenticated = false
   private var isAuthInProgress = false
+  private var hasRequestedPermissions = false
 
   // Runtime permission launcher
   private val permissionLauncher = registerForActivityResult(
@@ -170,7 +173,7 @@ class MainActivity : FragmentActivity() {
               subtitle = if (isAr) "مطلوب بصمة الدخول لفك تشفير النظام" else "Biometric uplink required to decrypt system",
               onSuccess = {
                 Toast.makeText(applicationContext, "Neural Interface Unlocked", Toast.LENGTH_SHORT).show()
-                requestEssentialPermissions()
+                // Permissions requested on next ON_RESUME to avoid ActivityResultLauncher state issues
               }
             )
           }
@@ -187,6 +190,10 @@ class MainActivity : FragmentActivity() {
                   vm.startSensors()
                   if (isSessionAuthenticated) {
                     prayerVm.updateLocation()
+                    if (!hasRequestedPermissions) {
+                      hasRequestedPermissions = true
+                      requestEssentialPermissions()
+                    }
                   }
                 }
                 Lifecycle.Event.ON_STOP -> { }
@@ -417,7 +424,11 @@ class MainActivity : FragmentActivity() {
                            triggerBiometricAuth(title, sub, onOk)
                         }
                       )
-                      "academy" -> AcademyScreen(viewModel = vm)
+                      "academy" -> AcademyScreen(
+                        viewModel = vm,
+                        onNavigateToGlossary = { navController.navigate("glossary") },
+                        onNavigateToChecklist = { navController.navigate("checklist") }
+                      )
                       "resources" -> ResourcesScreen(
                         viewModel = vm,
                         onClose = { activeTab = "home" }
@@ -437,6 +448,18 @@ class MainActivity : FragmentActivity() {
             }
             composable("link_scanner") { LinkScannerScreen(viewModel = vm, onBack = { navController.popBackStack() }) }
             composable("about") { AboutScreen(onBack = { navController.popBackStack() }) }
+            composable("glossary") {
+              CyberGlossaryScreen(
+                viewModel = vm,
+                onBack = { navController.popBackStack() }
+              )
+            }
+            composable("checklist") {
+              SecurityChecklistScreen(
+                viewModel = vm,
+                onBack = { navController.popBackStack() }
+              )
+            }
           }
         }
       }
