@@ -279,8 +279,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val isSettingsOpen: StateFlow<Boolean> = _isSettingsOpen.asStateFlow()
 
     private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(45, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .build()
 
     private suspend fun generateContentSafely(prompt: String): String {
@@ -311,12 +313,14 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
         // Neural Proxy mode: use alternative endpoint routing with extended timeouts and bypass headers
         val proxyEnabled = _isNeuralProxy.value
+        // Always use gemini-1.5-flash (stable). Proxy mode tries multiple endpoints for regional bypass.
         val endpointUrls = if (proxyEnabled) listOf(
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
             "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"
         ) else listOf(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
         )
 
         val activeClient = if (proxyEnabled) {

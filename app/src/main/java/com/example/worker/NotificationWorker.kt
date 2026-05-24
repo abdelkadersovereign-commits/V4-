@@ -34,7 +34,7 @@ class NotificationWorker(context: Context, params: WorkerParameters) : Coroutine
         // 2. Gemini Security Alert (if API key available)
         if (apiKey.isNotEmpty() && apiKey != "MY_GEMINI_API_KEY") {
             try {
-                val model = GenerativeModel(modelName = "gemini-3.5-flash", apiKey = apiKey)
+                val model = GenerativeModel(modelName = "gemini-1.5-flash", apiKey = apiKey)
                 val promptLocale = if (isAr) "Arabic" else "English"
                 val prompt = "Provide one very brief (12 words max) high-priority cybersecurity tip in $promptLocale. Be direct. No intro."
                 val res = model.generateContent(prompt).text ?: ""

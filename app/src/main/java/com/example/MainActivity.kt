@@ -1,9 +1,13 @@
 package com.example
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
@@ -62,9 +66,48 @@ import androidx.lifecycle.LifecycleEventObserver
 class MainActivity : FragmentActivity() {
   private var isSessionAuthenticated = false
 
+  // Runtime permission launcher for notifications + location (Android 13+)
+  private val permissionLauncher = registerForActivityResult(
+    ActivityResultContracts.RequestMultiplePermissions()
+  ) { results ->
+    val notifGranted = results[Manifest.permission.POST_NOTIFICATIONS] ?: true
+    val locationGranted = results[Manifest.permission.ACCESS_FINE_LOCATION]
+      ?: results[Manifest.permission.ACCESS_COARSE_LOCATION] ?: true
+    if (!notifGranted) {
+      Toast.makeText(this, "⚠ الإشعارات معطّلة — فعّلها من إعدادات التطبيق", Toast.LENGTH_LONG).show()
+    }
+    if (!locationGranted) {
+      Toast.makeText(this, "⚠ الموقع معطّل — مواقيت الصلاة ستكون تقريبية", Toast.LENGTH_LONG).show()
+    }
+  }
+
+  private fun requestEssentialPermissions() {
+    val needed = mutableListOf<String>()
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+        != PackageManager.PERMISSION_GRANTED) {
+        needed.add(Manifest.permission.POST_NOTIFICATIONS)
+      }
+    }
+    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+      != PackageManager.PERMISSION_GRANTED) {
+      needed.add(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+      != PackageManager.PERMISSION_GRANTED) {
+      needed.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+    }
+    if (needed.isNotEmpty()) {
+      permissionLauncher.launch(needed.toTypedArray())
+    }
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+
+    // Request notification + location permissions on first launch
+    requestEssentialPermissions()
     
     // Initialize Sovereign Pulse Protocol (WorkManager)
     val workRequest = PeriodicWorkRequestBuilder<NotificationWorker>(4, TimeUnit.HOURS)
