@@ -526,9 +526,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     init {
-        // Register Sensors
-        startSensors()
-
         // Register Battery Level
         val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         application.registerReceiver(batteryReceiver, filter)
