@@ -66,11 +66,12 @@ import androidx.lifecycle.LifecycleEventObserver
 
 class MainActivity : FragmentActivity() {
   private var isSessionAuthenticated = false
+  private var isAuthInProgress = false
 
-  // Runtime permission launcher — only launched AFTER biometric succeeds to avoid dialog conflict
+  // Runtime permission launcher
   private val permissionLauncher = registerForActivityResult(
     ActivityResultContracts.RequestMultiplePermissions()
-  ) { _ -> /* silently accepted; app works with fallback coords if location denied */ }
+  ) { _ -> /* Permissions handled */ }
 
   fun requestEssentialPermissions() {
     val needed = mutableListOf<String>()
@@ -93,7 +94,7 @@ class MainActivity : FragmentActivity() {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
 
-    // Initialize Sovereign Pulse Protocol (WorkManager)
+    // Initialize Sovereign Pulse Protocol
     val workRequest = PeriodicWorkRequestBuilder<NotificationWorker>(4, TimeUnit.HOURS)
       .setInitialDelay(15, TimeUnit.MINUTES)
       .build()
@@ -112,40 +113,42 @@ class MainActivity : FragmentActivity() {
           val isAr by vm.isArabic.collectAsState()
 
           fun triggerBiometricAuth(title: String, subtitle: String, onSuccess: () -> Unit) {
-            // Check device capability BEFORE showing prompt to avoid immediate crash
+            if (isAuthInProgress) return
+            
             val biometricManager = BiometricManager.from(this@MainActivity)
             val canAuth = biometricManager.canAuthenticate(
               BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
             )
+            
             if (canAuth != BiometricManager.BIOMETRIC_SUCCESS) {
-              // Device has no biometric/PIN enrolled — grant access silently
               isSessionAuthenticated = true
               onSuccess()
               return
             }
 
+            isAuthInProgress = true
             val executor = ContextCompat.getMainExecutor(this@MainActivity)
             val biometricPrompt = BiometricPrompt(this@MainActivity, executor,
               object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                   super.onAuthenticationError(errorCode, errString)
+                  isAuthInProgress = false
                   when (errorCode) {
-                    // User deliberately pressed back/cancel → close app
                     BiometricPrompt.ERROR_USER_CANCELED,
                     BiometricPrompt.ERROR_NEGATIVE_BUTTON -> finish()
-                    // System-initiated cancel (e.g. another dialog appeared) → do NOT close, just ignore
-                    BiometricPrompt.ERROR_CANCELED -> { /* retry on next ON_START */ }
+                    BiometricPrompt.ERROR_CANCELED -> { /* System cancel, wait for next trigger */ }
                     else -> Toast.makeText(applicationContext, "Auth Error: $errString", Toast.LENGTH_SHORT).show()
                   }
                 }
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                   super.onAuthenticationSucceeded(result)
+                  isAuthInProgress = false
                   isSessionAuthenticated = true
                   onSuccess()
                 }
                 override fun onAuthenticationFailed() {
                   super.onAuthenticationFailed()
-                  // Wrong fingerprint — prompt stays open, no action needed
+                  // Failed attempt, prompt stays open
                 }
               })
 
@@ -167,7 +170,6 @@ class MainActivity : FragmentActivity() {
               subtitle = if (isAr) "مطلوب بصمة الدخول لفك تشفير النظام" else "Biometric uplink required to decrypt system",
               onSuccess = {
                 Toast.makeText(applicationContext, "Neural Interface Unlocked", Toast.LENGTH_SHORT).show()
-                // Request permissions AFTER biometric — prevents dialog conflict crash
                 requestEssentialPermissions()
               }
             )
@@ -177,17 +179,19 @@ class MainActivity : FragmentActivity() {
             val observer = LifecycleEventObserver { _, event ->
               when (event) {
                 Lifecycle.Event.ON_START -> {
-                  if (!isSessionAuthenticated) {
+                  if (!isSessionAuthenticated && !isAuthInProgress) {
                     performSystemLock()
                   }
                 }
                 Lifecycle.Event.ON_RESUME -> {
                   vm.startSensors()
-                  prayerVm.updateLocation()
+                  // Only update location if already authenticated to avoid background resource contention
+                  if (isSessionAuthenticated) {
+                    prayerVm.updateLocation()
+                  }
                 }
                 Lifecycle.Event.ON_STOP -> {
-                  // REMOVED: isSessionAuthenticated = false 
-                  // This was causing the app to re-lock or exit when biometric/permission dialogs triggered lifecycle changes
+                  // Keep session authenticated during temporary backgrounding (like biometric dialog)
                 }
                 Lifecycle.Event.ON_PAUSE -> vm.stopSensors()
                 else -> {}
@@ -221,7 +225,6 @@ class MainActivity : FragmentActivity() {
               var activeTab by remember { mutableStateOf("home") }
               val haptic = LocalHapticFeedback.current
 
-              // Synchronize state flows from viewmodel triggers to bottom navigation clicks
               val isAcademyOpen by vm.isAcademyOpen.collectAsState()
               val isResourcesOpen by vm.isResourcesOpen.collectAsState()
               val isSettingsOpen by vm.isSettingsOpen.collectAsState()
@@ -269,7 +272,6 @@ class MainActivity : FragmentActivity() {
                           shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
                         )
                     ) {
-                      // Tab 1: Home
                       NavigationBarItem(
                         selected = activeTab == "home",
                         onClick = {
@@ -304,7 +306,6 @@ class MainActivity : FragmentActivity() {
                         )
                       )
 
-                      // Tab 2: Academy
                       NavigationBarItem(
                         selected = activeTab == "academy",
                         onClick = {
@@ -339,7 +340,6 @@ class MainActivity : FragmentActivity() {
                         )
                       )
 
-                      // Tab 3: Resources
                       NavigationBarItem(
                         selected = activeTab == "resources",
                         onClick = {
@@ -374,16 +374,16 @@ class MainActivity : FragmentActivity() {
                         )
                       )
 
-                      // Tab 4: Settings
                       NavigationBarItem(
-                        selected = isSettingsOpen,
+                        selected = activeTab == "settings",
                         onClick = {
                           haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                          vm.setSettingsOpen(!isSettingsOpen)
+                          activeTab = "settings"
+                          vm.setSettingsOpen(true)
                         },
                         icon = { 
                           Box(contentAlignment = Alignment.Center) {
-                            if (isSettingsOpen) {
+                            if (activeTab == "settings") {
                               Box(
                                 modifier = Modifier
                                   .size(40.dp)
@@ -391,13 +391,13 @@ class MainActivity : FragmentActivity() {
                                   .border(1.dp, CyberCyan.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
                               )
                             }
-                            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = if (isSettingsOpen) CyberCyan else Color.White.copy(alpha = 0.4f)) 
+                            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = if (activeTab == "settings") CyberCyan else Color.White.copy(alpha = 0.4f)) 
                           }
                         },
                         label = {
                           Text(
                             text = if (isAr) "الإعدادات" else "Settings",
-                            color = if (isSettingsOpen) CyberCyan else Color.White.copy(alpha = 0.4f),
+                            color = if (activeTab == "settings") CyberCyan else Color.White.copy(alpha = 0.4f),
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
@@ -409,58 +409,22 @@ class MainActivity : FragmentActivity() {
                       )
                     }
                   }
-                ) { padding ->
-                  Box(
-                    modifier = Modifier
-                      .fillMaxSize()
-                      .padding(padding)
-                  ) {
-                    // Main Content with slide/fade transition
-                    AnimatedContent(
-                      targetState = activeTab,
-                      transitionSpec = {
-                        (slideInHorizontally(animationSpec = tween(400)) { it } + fadeIn(tween(400)))
-                          .togetherWith(slideOutHorizontally(animationSpec = tween(400)) { -it } + fadeOut(tween(400)))
-                      },
-                      label = "tabAnimation"
-                    ) { tab ->
-                      when (tab) {
-                        "home" -> {
-                          DashboardScreen(
-                            viewModel = vm, 
-                            prayerViewModel = prayerVm,
-                            onNavigateToScanner = {
-                              navController.navigate("scanner")
-                            },
-                            onVaultLockRequest = { title, sub, success ->
-                              triggerBiometricAuth(title, sub, onSuccess = success)
-                            }
-                          )
+                ) { innerPadding ->
+                  Box(modifier = Modifier.padding(innerPadding)) {
+                    when (activeTab) {
+                      "home" -> DashboardScreen(
+                        onLinkScannerRequest = { navController.navigate("link_scanner") },
+                        onAboutRequest = { navController.navigate("about") },
+                        onVaultLockRequest = { title, sub, onOk -> 
+                           triggerBiometricAuth(title, sub, onOk)
                         }
-                        "academy" -> {
-                          AcademyScreen(viewModel = vm)
-                        }
-                        "resources" -> {
-                          ResourcesScreen(viewModel = vm, onClose = { activeTab = "home" })
-                        }
-                      }
-                    }
-
-                    // Settings Overlay with slide from right motion
-                    AnimatedVisibility(
-                      visible = isSettingsOpen,
-                      enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
-                      exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
-                    ) {
-                      SettingsScreen(
-                        viewModel = vm,
-                        onClose = { vm.setSettingsOpen(false) },
-                        onOpenAbout = {
-                          vm.setSettingsOpen(false)
-                          navController.navigate("about")
-                        },
-                        onLockRequest = { title, sub, success ->
-                          triggerBiometricAuth(title, sub, onSuccess = success)
+                      )
+                      "academy" -> AcademyScreen()
+                      "resources" -> ResourcesScreen()
+                      "settings" -> SettingsScreen(
+                        onBack = { activeTab = "home" },
+                        onLockRequest = { title, sub, onOk ->
+                           triggerBiometricAuth(title, sub, onOk)
                         }
                       )
                     }
@@ -468,17 +432,8 @@ class MainActivity : FragmentActivity() {
                 }
               }
             }
-            composable("scanner") {
-              LinkScannerScreen(
-                viewModel = vm,
-                onBack = { navController.popBackStack() }
-              )
-            }
-            composable("about") {
-              AboutScreen(
-                onBack = { navController.popBackStack() }
-              )
-            }
+            composable("link_scanner") { LinkScannerScreen(onBack = { navController.popBackStack() }) }
+            composable("about") { AboutScreen(onBack = { navController.popBackStack() }) }
           }
         }
       }
