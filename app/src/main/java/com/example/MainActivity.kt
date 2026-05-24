@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit
 import com.example.ui.screens.SettingsScreen
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.text.font.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -186,7 +186,8 @@ class MainActivity : FragmentActivity() {
                   prayerVm.updateLocation()
                 }
                 Lifecycle.Event.ON_STOP -> {
-                  isSessionAuthenticated = false
+                  // REMOVED: isSessionAuthenticated = false 
+                  // This was causing the app to re-lock or exit when biometric/permission dialogs triggered lifecycle changes
                 }
                 Lifecycle.Event.ON_PAUSE -> vm.stopSensors()
                 else -> {}
@@ -378,18 +379,7 @@ class MainActivity : FragmentActivity() {
                         selected = isSettingsOpen,
                         onClick = {
                           haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                          if (vm.isSettingsAuthenticated.value) {
-                            vm.setSettingsOpen(true)
-                          } else {
-                            triggerBiometricAuth(
-                              title = if (isAr) "تأكيد الهوية السيادية" else "SOVEREIGN IDENTITY VERIFIED",
-                              subtitle = if (isAr) "مطلوب بصمة الدخول للوصول إلى الإعدادات النخبوية" else "Biometric uplink required for elite configuration access",
-                              onSuccess = {
-                                vm.setSettingsAuthenticated(true)
-                                vm.setSettingsOpen(true)
-                              }
-                            )
-                          }
+                          vm.setSettingsOpen(!isSettingsOpen)
                         },
                         icon = { 
                           Box(contentAlignment = Alignment.Center) {
@@ -419,12 +409,13 @@ class MainActivity : FragmentActivity() {
                       )
                     }
                   }
-                ) { innerPadding ->
+                ) { padding ->
                   Box(
                     modifier = Modifier
                       .fillMaxSize()
-                      .padding(bottom = innerPadding.calculateBottomPadding())
+                      .padding(padding)
                   ) {
+                    // Main Content with slide/fade transition
                     AnimatedContent(
                       targetState = activeTab,
                       transitionSpec = {
