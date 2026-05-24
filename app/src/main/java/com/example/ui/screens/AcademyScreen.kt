@@ -101,7 +101,9 @@ fun ShimmerEffect(
 @Composable
 fun AcademyScreen(
     viewModel: DashboardViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateToGlossary: () -> Unit = {},
+    onNavigateToChecklist: () -> Unit = {}
 ) {
     val isAr by viewModel.isArabic.collectAsState()
     val layoutDirection = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
